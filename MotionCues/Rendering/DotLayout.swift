@@ -28,8 +28,22 @@
 import Foundation
 import CoreGraphics
 
+/// Which edge a dot belongs to. It decides which axis the dot streams along
+/// (the one parallel to its own edge, where there is room) and which axis is
+/// a bounded excursion (the one pointing off-screen).
+enum DotEdge {
+    case left, right, top, bottom
+    var isVertical: Bool { self == .left || self == .right }
+}
+
 struct DotPosition {
     var home: CGPoint
+    var edge: DotEdge
+    /// Half the length of the run this dot roams along its edge, in points.
+    var band: Double
+    /// How far the dot may move across its edge before it would leave the
+    /// screen: (towards negative, towards positive) on the across axis.
+    var acrossRoom: (negative: Double, positive: Double)
     /// 0.85…1.15, a small deterministic per-dot gain so the field breathes
     /// instead of sliding as one rigid slab.
     var gainScale: Double
@@ -45,7 +59,10 @@ enum DotLayout {
         let n = max(2, min(40, settings.dotsPerEdge))
         let inset = settings.edgeInset
 
-        func column(x: CGFloat) {
+        // Keep a dot's whole body on screen when it is at its excursion limit.
+        let margin = settings.dotDiameter
+
+        func column(x: CGFloat, edge: DotEdge) {
             // Spread over the middle 80% of the edge; the extreme corners are
             // where the eye is least sensitive and where menu bars live.
             let usable = size.height * 0.8
@@ -53,36 +70,47 @@ enum DotLayout {
             for i in 0..<n {
                 let t = n == 1 ? 0.5 : Double(i) / Double(n - 1)
                 let y = start + usable * t
-                result.append(make(CGPoint(x: x, y: y), index: result.count))
+                result.append(make(CGPoint(x: x, y: y), index: result.count,
+                                   edge: edge, band: Double(usable) / 2,
+                                   room: (max(0, Double(x) - margin),
+                                          max(0, Double(size.width - x) - margin))))
             }
         }
 
-        func row(y: CGFloat) {
+        func row(y: CGFloat, edge: DotEdge) {
             let usable = size.width * 0.8
             let start = (size.width - usable) / 2
             for i in 0..<n {
                 let t = n == 1 ? 0.5 : Double(i) / Double(n - 1)
                 let x = start + usable * t
-                result.append(make(CGPoint(x: x, y: y), index: result.count))
+                result.append(make(CGPoint(x: x, y: y), index: result.count,
+                                   edge: edge, band: Double(usable) / 2,
+                                   room: (max(0, Double(y) - margin),
+                                          max(0, Double(size.height - y) - margin))))
             }
         }
 
-        column(x: inset)
-        column(x: size.width - inset)
+        column(x: inset, edge: .left)
+        column(x: size.width - inset, edge: .right)
 
         if settings.placement == .sidesAndTopBottom {
-            row(y: inset)
-            row(y: size.height - inset)
+            row(y: inset, edge: .bottom)
+            row(y: size.height - inset, edge: .top)
         }
 
         return result
     }
 
-    private static func make(_ point: CGPoint, index: Int) -> DotPosition {
+    private static func make(_ point: CGPoint, index: Int, edge: DotEdge,
+                             band: Double,
+                             room: (negative: Double, positive: Double)) -> DotPosition {
         // Deterministic pseudo-random variation — same layout every launch.
         let h = Double((index &* 2_654_435_761) % 1000) / 1000.0
         let h2 = Double((index &* 40_503 &+ 17) % 1000) / 1000.0
         return DotPosition(home: point,
+                           edge: edge,
+                           band: band,
+                           acrossRoom: room,
                            gainScale: 0.85 + 0.3 * h,
                            springScale: 0.85 + 0.15 * h2)
     }

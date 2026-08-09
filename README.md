@@ -234,6 +234,33 @@ dashboard moves and what your vestibular system reports:
 | turns right | left |
 | crests a rise | slightly down |
 
+But the dominant term is **velocity, not displacement**. The first version only
+offset each dot in proportion to instantaneous acceleration, and that is a weak
+cue: a firm brake is 0.3 g, which at the High setting is 24 points of travel,
+and 24 points that then spring back is close to invisible in peripheral vision —
+which is exactly where these dots live.
+
+What the visual system responds to is optic flow. So a dot's drift *speed* is
+proportional to acceleration. Standing still means no acceleration and therefore
+no flow at all, so the field is genuinely static at rest. A sustained brake
+produces continuous drift for as long as it lasts. Harder braking is faster,
+not merely further. Integrating acceleration gives a change in velocity, and
+matching flow speed to Δv is a closer analogue of what the inner ear reports
+than matching displacement to acceleration is.
+
+The two axes are deliberately not symmetric:
+
+* **Longitudinal** motion runs *along* the edge columns, where there is a whole
+  screen of room. Dots stream up or down continuously, fade out at the end of
+  the column and reappear at the other end, so a long manoeuvre never runs out
+  of flow and never leaves a gap.
+* **Lateral** motion runs *across* them, where there is almost none — a dot 40
+  points from the left edge has 40 points before it is off-screen. So cornering
+  is a bounded excursion that saturates smoothly against the room that
+  particular dot actually has, and relaxes back to the edge when the corner
+  ends. Letting it drift freely made the near column walk straight off the
+  screen for about a second during any sustained turn.
+
 Travel is hard-clamped at 140 pt so a pothole can never fling a dot across the
 screen.
 

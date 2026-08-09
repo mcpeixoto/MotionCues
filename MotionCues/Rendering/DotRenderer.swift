@@ -22,7 +22,7 @@ import QuartzCore
 
 protocol DotRendering: AnyObject {
     func configure(settings: RenderSettings, size: CGSize, scale: CGFloat, isDark: Bool)
-    func render(offset: CGPoint, emphasis: Double, dt: Double)
+    func render(motion: VehicleMotion, dt: Double)
 }
 
 final class LayerDotRenderer: DotRendering {
@@ -31,6 +31,8 @@ final class LayerDotRenderer: DotRendering {
     private var positions: [DotPosition] = []
     private var springsX: [SpringFollower] = []
     private var springsY: [SpringFollower] = []
+    private var flows: [DotFlowState] = []
+
     private var settings = RenderSettings()
     private var currentOpacity: Double = 0
 
@@ -63,6 +65,12 @@ final class LayerDotRenderer: DotRendering {
 
         springsX = positions.map { SpringFollower(omega: settings.springOmega * $0.springScale) }
         springsY = positions.map { SpringFollower(omega: settings.springOmega * $0.springScale) }
+        // Stagger the fade phase deterministically so the field never recycles
+        // as one block.
+        flows = positions.enumerated().map { i, _ in
+            DotFlowState(phase: Double((i &* 7919) % 1000) / 1000.0)
+        }
+
 
         let d = CGFloat(settings.dotDiameter)
         let useLight: Bool
@@ -95,11 +103,18 @@ final class LayerDotRenderer: DotRendering {
         currentOpacity = settings.opacity
     }
 
-    func render(offset: CGPoint, emphasis: Double, dt: Double) {
+    func render(motion: VehicleMotion, dt: Double) {
         guard !dotLayers.isEmpty else { return }
 
         CATransaction.begin()
         CATransaction.setDisableActions(true)
+
+        // Instantaneous displacement: keeps the field responsive to the very
+        // start of a manoeuvre, before drift has had time to accumulate.
+        let offset = DotLayout.offset(for: motion, settings: settings)
+        // Flow: the dominant cue. See DotFlow.
+        let speed = DotFlow.speed(for: motion, settings: settings)
+        let emphasis = min(1.0, motion.magnitude / 0.25)
 
         // Emphasis lifts opacity a little while things are happening, so the
         // dots recede almost completely when the car is standing still.
@@ -110,13 +125,31 @@ final class LayerDotRenderer: DotRendering {
 
         for i in 0..<dotLayers.count {
             let p = positions[i]
+
+            // Each dot streams along its own edge and is bounded across it,
+            // by the room it actually has.
+            let vertical = p.edge.isVertical
+            let alongSpeed = (vertical ? speed.along : speed.across) * p.gainScale
+            let acrossSpeed = (vertical ? speed.across : speed.along) * p.gainScale
+            flows[i].step(alongSpeed: alongSpeed,
+                          acrossSpeed: acrossSpeed,
+                          band: p.band,
+                          acrossLimit: min(settings.flowAcrossLimit, p.acrossRoom.positive),
+                          acrossLimitNegative: min(settings.flowAcrossLimit, p.acrossRoom.negative),
+                          dt: dt)
+
             let tx = Double(offset.x) * p.gainScale
             let ty = Double(offset.y) * p.gainScale
-            let x = springsX[i].step(target: tx, dt: dt)
-            let y = springsY[i].step(target: ty, dt: dt)
+            let sx = springsX[i].step(target: tx, dt: dt)
+            let sy = springsY[i].step(target: ty, dt: dt)
+
+            // `offset` is (across, along); map it back to screen axes.
+            let f = flows[i].offset
+            let flow = vertical ? CGPoint(x: f.x, y: f.y) : CGPoint(x: f.y, y: f.x)
             let layer = dotLayers[i]
-            layer.position = CGPoint(x: p.home.x + CGFloat(x), y: p.home.y + CGFloat(y))
-            layer.opacity = Float(currentOpacity)
+            layer.position = CGPoint(x: p.home.x + flow.x + CGFloat(sx),
+                                     y: p.home.y + flow.y + CGFloat(sy))
+            layer.opacity = Float(currentOpacity * flows[i].envelope(band: p.band))
         }
 
         CATransaction.commit()
@@ -127,7 +160,14 @@ final class LayerDotRenderer: DotRendering {
     var isSettled: Bool {
         for i in 0..<springsX.count {
             if abs(springsX[i].position) > 0.05 || abs(springsY[i].position) > 0.05 { return false }
+            if abs(flows[i].offset.x) > 0.05 || abs(flows[i].offset.y) > 0.05 { return false }
         }
         return true
+    }
+
+    /// Send every dot home. Used when the source changes and the accumulated
+    /// drift no longer means anything.
+    func resetFlow() {
+        for i in 0..<flows.count { flows[i].reset() }
     }
 }

@@ -69,4 +69,9 @@ struct RenderSettings: Equatable {
     var verticalCues: Bool = true
     var springOmega: Double = 18
     var idleFadeEnabled: Bool = true
+    /// Drift speed in points per second per g. The dominant cue — see DotFlow.
+    var flowGain: Double = 620
+    /// Maximum excursion across the column, in points. Small on purpose —
+    /// there is no room sideways. See DotFlow.
+    var flowAcrossLimit: Double = 90
 }

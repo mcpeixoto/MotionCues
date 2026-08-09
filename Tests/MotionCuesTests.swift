@@ -449,3 +449,184 @@ final class RateMeterTests: XCTestCase {
         XCTAssertEqual(meter.rateHz, 100, accuracy: 5)
     }
 }
+
+// MARK: - Flow model
+
+/// The flow model is the dominant cue, so its properties matter more than the
+/// instantaneous offset's: silent at rest, continuous under a sustained
+/// manoeuvre, never a gap, and never a dot stranded off-screen.
+final class DotFlowTests: XCTestCase {
+    private var settings: RenderSettings {
+        var s = RenderSettings()
+        s.flowGain = 620
+        s.flowAcrossLimit = 90
+        s.verticalCues = false
+        return s
+    }
+    private let band = 380.0        // half of 0.8 × 956 pt, a typical screen
+
+    func testNoFlowAtRest() {
+        let v = DotFlow.speed(for: .zero, settings: settings)
+        XCTAssertEqual(v.along, 0, accuracy: 1e-9)
+        XCTAssertEqual(v.across, 0, accuracy: 1e-9)
+    }
+
+    /// Same convention as the static offset: dots follow the pseudo-force.
+    func testFlowFollowsThePseudoForce() {
+        let accelerating = VehicleMotion(forward: 0.2, lateral: 0, vertical: 0, yawRate: 0, timestamp: 0)
+        XCTAssertLessThan(DotFlow.speed(for: accelerating, settings: settings).along, 0)
+
+        let braking = VehicleMotion(forward: -0.2, lateral: 0, vertical: 0, yawRate: 0, timestamp: 0)
+        XCTAssertGreaterThan(DotFlow.speed(for: braking, settings: settings).along, 0)
+
+        let left = VehicleMotion(forward: 0, lateral: 0.2, vertical: 0, yawRate: 0.3, timestamp: 0)
+        XCTAssertGreaterThan(DotFlow.speed(for: left, settings: settings).across, 0)
+    }
+
+    func testFlowSpeedIsCapped() {
+        let violent = VehicleMotion(forward: 12, lateral: -12, vertical: 0, yawRate: 0, timestamp: 0)
+        let v = DotFlow.speed(for: violent, settings: settings)
+        XCTAssertLessThanOrEqual(abs(v.along), settings.flowGain * 0.8 + 1e-6)
+        XCTAssertLessThanOrEqual(abs(v.across), settings.flowGain * 0.8 + 1e-6)
+    }
+
+    /// The whole point: a dot must keep moving under a sustained brake instead
+    /// of hopping once and stopping.
+    func testSustainedBrakingKeepsProducingFlow() {
+        var flow = DotFlowState(phase: 0.5)
+        var travelled = 0.0
+        var wraps = 0
+        var previous = flow.offset.y
+
+        for _ in 0..<300 {              // 5 s at 60 fps
+            flow.step(alongSpeed: 200, acrossSpeed: 0, band: band,
+                      acrossLimit: settings.flowAcrossLimit,
+                      acrossLimitNegative: settings.flowAcrossLimit, dt: 1.0 / 60.0)
+            let y = Double(flow.offset.y)
+            if y < previous { wraps += 1 } else { travelled += y - previous }
+            previous = y
+        }
+        // 5 s at 200 pt/s is 1000 pt of flow; the column is 760 pt, so it must
+        // have wrapped at least once and kept going.
+        XCTAssertGreaterThan(wraps, 0, "flow ran out instead of wrapping")
+        XCTAssertGreaterThan(travelled + Double(wraps) * band * 2, 900)
+    }
+
+    /// The wrap must happen while the dot is invisible.
+    func testDotIsInvisibleWhenItWraps() {
+        var flow = DotFlowState(phase: 0.0)
+        var previous = Double(flow.offset.y)
+        for _ in 0..<600 {
+            flow.step(alongSpeed: 200, acrossSpeed: 0, band: band,
+                      acrossLimit: settings.flowAcrossLimit,
+                      acrossLimitNegative: settings.flowAcrossLimit, dt: 1.0 / 60.0)
+            let y = Double(flow.offset.y)
+            if y < previous {           // just wrapped
+                XCTAssertLessThan(flow.envelope(band: band), 0.05,
+                                  "the dot jumped while still visible")
+                return
+            }
+            previous = y
+        }
+        XCTFail("never wrapped")
+    }
+
+    /// A dot must never end up further sideways than the screen allows —
+    /// letting it drift freely made the right-hand column disappear.
+    func testLateralExcursionIsBounded() {
+        var flow = DotFlowState(phase: 0.4)
+        for _ in 0..<1200 {             // 20 s of hard, sustained cornering
+            flow.step(alongSpeed: 0, acrossSpeed: 400, band: band,
+                      acrossLimit: settings.flowAcrossLimit,
+                      acrossLimitNegative: settings.flowAcrossLimit, dt: 1.0 / 60.0)
+        }
+        XCTAssertLessThanOrEqual(Double(flow.offset.x), settings.flowAcrossLimit + 1e-6)
+        XCTAssertGreaterThan(Double(flow.offset.x), settings.flowAcrossLimit * 0.5,
+                             "the excursion should saturate near the limit, not collapse")
+    }
+
+    /// When the corner ends the field must come home, not stay displaced.
+    func testLateralExcursionDecaysBack() {
+        var flow = DotFlowState(phase: 0.4)
+        for _ in 0..<300 {
+            flow.step(alongSpeed: 0, acrossSpeed: 400, band: band,
+                      acrossLimit: settings.flowAcrossLimit,
+                      acrossLimitNegative: settings.flowAcrossLimit, dt: 1.0 / 60.0)
+        }
+        XCTAssertGreaterThan(Double(flow.offset.x), 40)
+        for _ in 0..<600 {              // 10 s straight afterwards
+            flow.step(alongSpeed: 0, acrossSpeed: 0, band: band,
+                      acrossLimit: settings.flowAcrossLimit,
+                      acrossLimitNegative: settings.flowAcrossLimit, dt: 1.0 / 60.0)
+        }
+        XCTAssertLessThan(abs(Double(flow.offset.x)), 2, "the field never returned to the edge")
+    }
+
+    /// The real bug this replaced: with a uniform sideways limit, the column
+    /// nearest the direction of drift walked straight off the screen.
+    func testExcursionRespectsTheRoomTheDotActuallyHas() {
+        var flow = DotFlowState(phase: 0.4)
+        // A dot 40 pt from the left edge: plenty of room right, almost none left.
+        for _ in 0..<900 {
+            flow.step(alongSpeed: 0, acrossSpeed: -400, band: band,
+                      acrossLimit: 90, acrossLimitNegative: 25, dt: 1.0 / 60.0)
+        }
+        XCTAssertGreaterThanOrEqual(Double(flow.offset.x), -25 - 1e-6,
+                                    "the dot walked off the near edge")
+    }
+
+    func testDotLayoutGivesEdgeDotsTheirRealRoom() {
+        var s = RenderSettings()
+        s.dotsPerEdge = 4
+        s.edgeInset = 40
+        s.dotDiameter = 10
+        let size = CGSize(width: 1470, height: 956)
+        let dots = DotLayout.positions(in: size, settings: s)
+
+        let left = try! XCTUnwrap(dots.first { $0.edge == .left })
+        XCTAssertEqual(left.acrossRoom.negative, 30, accuracy: 0.001)   // 40 − 10
+        XCTAssertGreaterThan(left.acrossRoom.positive, 1000)
+
+        let right = try! XCTUnwrap(dots.first { $0.edge == .right })
+        XCTAssertEqual(right.acrossRoom.positive, 30, accuracy: 0.001)
+        XCTAssertGreaterThan(right.acrossRoom.negative, 1000)
+
+        // Side dots stream vertically; top/bottom dots stream horizontally.
+        XCTAssertTrue(left.edge.isVertical)
+        s.placement = .sidesAndTopBottom
+        let all = DotLayout.positions(in: size, settings: s)
+        XCTAssertFalse(try! XCTUnwrap(all.first { $0.edge == .top }).edge.isVertical)
+    }
+
+    /// A parked car must not shimmer.
+    func testRestIsStaticAndFullyVisible() {
+        var flow = DotFlowState(phase: 0.3)
+        for _ in 0..<600 {
+            flow.step(alongSpeed: 0, acrossSpeed: 0, band: band,
+                      acrossLimit: settings.flowAcrossLimit,
+                      acrossLimitNegative: settings.flowAcrossLimit, dt: 1.0 / 60.0)
+        }
+        XCTAssertEqual(Double(flow.offset.y), 0, accuracy: 1e-9)
+        XCTAssertEqual(Double(flow.offset.x), 0, accuracy: 1e-9)
+        XCTAssertEqual(flow.envelope(band: band), 1.0, accuracy: 1e-9)
+    }
+
+    /// Dots must not all fade on the same frame, or the field strobes.
+    func testFadingIsStaggeredAcrossDots() {
+        var flows = (0..<14).map { DotFlowState(phase: Double(($0 &* 7919) % 1000) / 1000.0) }
+        var firstFadeFrame: [Int: Int] = [:]
+        for frame in 0..<600 {
+            for i in flows.indices {
+                flows[i].step(alongSpeed: 150, acrossSpeed: 0, band: band,
+                              acrossLimit: settings.flowAcrossLimit,
+                      acrossLimitNegative: settings.flowAcrossLimit, dt: 1.0 / 60.0)
+                if flows[i].envelope(band: band) < 0.5, firstFadeFrame[i] == nil {
+                    firstFadeFrame[i] = frame
+                }
+            }
+        }
+        XCTAssertEqual(firstFadeFrame.count, flows.count, "some dots never faded")
+        XCTAssertGreaterThan(Set(firstFadeFrame.values).count, 5,
+                             "dots faded in lockstep — the field would strobe")
+    }
+}

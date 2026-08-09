@@ -117,10 +117,7 @@ final class OverlayView: NSView {
         lastTick = now
 
         let motion = state.load()
-        let offset = DotLayout.offset(for: motion, settings: settings)
-        // Emphasis saturates around 0.25 g, roughly a firm braking event.
-        let emphasis = min(1.0, motion.magnitude / 0.25)
-        renderer.render(offset: offset, emphasis: emphasis, dt: dt)
+        renderer.render(motion: motion, dt: dt)
 
         // Park when nothing has moved for a while. The AppCoordinator calls
         // `wake()` as soon as a non-trivial sample shows up again.

@@ -123,9 +123,7 @@ for frameIndex in 0..<(warmupFrames + totalFrames) {
 
     // Advance the visual state.
     let motion = engine.state.load()
-    let offset = DotLayout.offset(for: motion, settings: settings)
-    let emphasis = min(1.0, motion.magnitude / 0.25)
-    renderer.render(offset: offset, emphasis: emphasis, dt: frameDt)
+    renderer.render(motion: motion, dt: frameDt)
 
     guard frameIndex >= warmupFrames else { continue }
 
