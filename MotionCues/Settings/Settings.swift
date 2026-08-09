@@ -17,19 +17,17 @@ final class AppSettings: ObservableObject {
     private let defaults: UserDefaults
     private var cancellables = Set<AnyCancellable>()
 
-    @Published var dotsPerEdge: Int { didSet { defaults.set(dotsPerEdge, forKey: K.dotsPerEdge) } }
     @Published var dotDiameter: Double { didSet { defaults.set(dotDiameter, forKey: K.dotDiameter) } }
     @Published var opacity: Double { didSet { defaults.set(opacity, forKey: K.opacity) } }
-    @Published var edgeInset: Double { didSet { defaults.set(edgeInset, forKey: K.edgeInset) } }
     @Published var intensity: CueIntensity { didSet { defaults.set(intensity.rawValue, forKey: K.intensity) } }
     @Published var smoothing: Double { didSet { defaults.set(smoothing, forKey: K.smoothing) } }
     @Published var sensitivity: Double { didSet { defaults.set(sensitivity, forKey: K.sensitivity) } }
-    @Published var placement: DotPlacement { didSet { defaults.set(placement.rawValue, forKey: K.placement) } }
     @Published var appearance: CueAppearance { didSet { defaults.set(appearance.rawValue, forKey: K.appearance) } }
     @Published var verticalCues: Bool { didSet { defaults.set(verticalCues, forKey: K.verticalCues) } }
     @Published var sourceKind: MotionSourceKind { didSet { defaults.set(sourceKind.rawValue, forKey: K.sourceKind) } }
     @Published var startOnLaunch: Bool { didSet { defaults.set(startOnLaunch, forKey: K.startOnLaunch) } }
     @Published var hideFromScreenCapture: Bool { didSet { defaults.set(hideFromScreenCapture, forKey: K.hideFromCapture) } }
+    @Published var peripherySize: Double { didSet { defaults.set(peripherySize, forKey: K.peripherySize) } }
     @Published var responsiveness: Double { didSet { defaults.set(responsiveness, forKey: K.responsiveness) } }
     @Published var idleFade: Bool { didSet { defaults.set(idleFade, forKey: K.idleFade) } }
 
@@ -47,36 +45,32 @@ final class AppSettings: ObservableObject {
     init(defaults: UserDefaults = .standard) {
         self.defaults = defaults
         defaults.register(defaults: [
-            K.dotsPerEdge: 8,
             K.dotDiameter: 7.0,
             K.opacity: 0.45,
-            K.edgeInset: 26.0,
             K.intensity: CueIntensity.medium.rawValue,
             K.smoothing: 0.5,
             K.sensitivity: 0.5,
-            K.placement: DotPlacement.sides.rawValue,
             K.appearance: CueAppearance.automatic.rawValue,
             K.verticalCues: true,
             K.sourceKind: MotionSourceKind.automatic.rawValue,
             K.startOnLaunch: false,
             K.hideFromCapture: false,
+            K.peripherySize: 240.0,
             K.responsiveness: 0.5,
             K.idleFade: true
         ])
 
-        dotsPerEdge = defaults.integer(forKey: K.dotsPerEdge)
         dotDiameter = defaults.double(forKey: K.dotDiameter)
         opacity = defaults.double(forKey: K.opacity)
-        edgeInset = defaults.double(forKey: K.edgeInset)
         intensity = CueIntensity(rawValue: defaults.string(forKey: K.intensity) ?? "") ?? .medium
         smoothing = defaults.double(forKey: K.smoothing)
         sensitivity = defaults.double(forKey: K.sensitivity)
-        placement = DotPlacement(rawValue: defaults.string(forKey: K.placement) ?? "") ?? .sides
         appearance = CueAppearance(rawValue: defaults.string(forKey: K.appearance) ?? "") ?? .automatic
         verticalCues = defaults.bool(forKey: K.verticalCues)
         sourceKind = MotionSourceKind(rawValue: defaults.string(forKey: K.sourceKind) ?? "") ?? .automatic
         startOnLaunch = defaults.bool(forKey: K.startOnLaunch)
         hideFromScreenCapture = defaults.bool(forKey: K.hideFromCapture)
+        peripherySize = defaults.double(forKey: K.peripherySize)
         responsiveness = defaults.double(forKey: K.responsiveness)
         idleFade = defaults.bool(forKey: K.idleFade)
 
@@ -101,48 +95,40 @@ final class AppSettings: ObservableObject {
     }
 
     func snapshot() -> RenderSettings {
-        RenderSettings(dotsPerEdge: dotsPerEdge,
-                       dotDiameter: dotDiameter,
+        RenderSettings(dotDiameter: dotDiameter,
                        opacity: opacity,
-                       edgeInset: edgeInset,
-                       gain: intensity.gain,
-                       placement: placement,
                        appearance: appearance,
                        verticalCues: verticalCues,
-                       // responsiveness 0…1 → 9…30 rad/s natural frequency
-                       springOmega: 9 + 21 * max(0, min(1, responsiveness)),
-                       idleFadeEnabled: idleFade)
+                       idleFadeEnabled: idleFade,
+                       flowGain: intensity.flowGain,
+                       peripherySize: peripherySize)
     }
 
     func resetToDefaults() {
-        dotsPerEdge = 8
-        dotDiameter = 7
-        opacity = 0.45
-        edgeInset = 26
+        dotDiameter = 9
+        opacity = 0.55
         intensity = .medium
         smoothing = 0.5
         sensitivity = 0.5
         responsiveness = 0.5
-        placement = .sides
+        peripherySize = 240
         appearance = .automatic
         verticalCues = true
         idleFade = true
     }
 
     private enum K {
-        static let dotsPerEdge = "dotsPerEdge"
         static let dotDiameter = "dotDiameter"
         static let opacity = "opacity"
-        static let edgeInset = "edgeInset"
         static let intensity = "intensity"
         static let smoothing = "smoothing"
         static let sensitivity = "sensitivity"
-        static let placement = "placement"
         static let appearance = "appearance"
         static let verticalCues = "verticalCues"
         static let sourceKind = "sourceKind"
         static let startOnLaunch = "startOnLaunch"
         static let hideFromCapture = "hideFromScreenCapture"
+        static let peripherySize = "peripherySize"
         static let responsiveness = "responsiveness"
         static let idleFade = "idleFade"
         static let calibration = "calibration"

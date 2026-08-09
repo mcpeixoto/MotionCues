@@ -65,27 +65,23 @@ var settings = RenderSettings()
 // opacity disappears in a compressed, autoplaying timeline video. The *gain*
 // is untouched at the app's real High setting — the dots are easier to see,
 // they do not move further than they really would.
-settings.dotsPerEdge = 7
-settings.dotDiameter = 15
-settings.opacity = 0.95
-settings.edgeInset = 40
-settings.gain = CueIntensity.high.gain     // disclosed in the alt text
-settings.placement = .sides
-settings.appearance = .dark                // light dots, this backdrop is dark
+settings.dotDiameter = 13
+settings.opacity = 0.9
+settings.peripherySize = 300
+settings.flowGain = CueIntensity.high.flowGain   // disclosed in the alt text
+settings.appearance = .dark                // light-first pairing; backdrop is dark
 settings.verticalCues = true
-settings.springOmega = 18
-settings.idleFadeEnabled = true
 
 let engine = MotionEngine()
 engine.smoothing = 0.45
 engine.sensitivity = 0.6
 
-// The layer tree the renderer draws into. Not attached to any window — we
-// render it straight into a bitmap context each frame.
-let root = CALayer()
-root.frame = CGRect(origin: .zero, size: pointSize)
-root.contentsScale = scale
-let renderer = LayerDotRenderer(root: root)
+// The shipping Metal renderer, pointed at an offscreen texture instead of a
+// window. Same code path, same shader.
+guard let renderer = MetalDotRenderer() else {
+    FileHandle.standardError.write("no Metal device\n".data(using: .utf8)!)
+    exit(1)
+}
 renderer.configure(settings: settings, size: pointSize, scale: scale, isDark: true)
 
 // Drive the simulator synchronously rather than through its dispatch timer, so
@@ -123,7 +119,7 @@ for frameIndex in 0..<(warmupFrames + totalFrames) {
 
     // Advance the visual state.
     let motion = engine.state.load()
-    renderer.render(motion: motion, dt: frameDt)
+    let overlay = renderer.renderToImage(motion: motion, dt: frameDt, scale: scale)
 
     guard frameIndex >= warmupFrames else { continue }
 
@@ -139,12 +135,11 @@ for frameIndex in 0..<(warmupFrames + totalFrames) {
         exit(1)
     }
     ctx.draw(backdropCG, in: CGRect(origin: .zero, size: pixelSize))
+    if let overlay {
+        ctx.draw(overlay, in: CGRect(origin: .zero, size: pixelSize))
+    }
     ctx.saveGState()
     ctx.scaleBy(x: scale, y: scale)
-    // Rest-position marks first, so the dots sit on top of their own reference.
-    Annotations.drawRestMarks(DotLayout.positions(in: pointSize, settings: settings),
-                              diameter: CGFloat(settings.dotDiameter), in: ctx)
-    root.render(in: ctx)
     Annotations.drawPanel(motion: motion, in: ctx, canvas: pointSize)
     Annotations.drawCaption("Dots move opposite to the car, like a loose object on the dashboard",
                             in: ctx, canvas: pointSize)

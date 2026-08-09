@@ -14,7 +14,7 @@ sources directly and drives them frame by frame:
 |---|---|
 | Sensor samples | `SimulatedMotionProvider` — the app's own Simulator source, same misaligned sensor orientation, same band-limited road vibration |
 | Reference frame, calibration, filtering | `MotionEngine` — untouched |
-| Dot geometry | `DotLayout` + `LayerDotRenderer` — the same classes the overlay uses, including per-dot gain variation and the critically damped springs |
+| Particles | `ParticleField` + `MetalDotRenderer` — the same field and the same shader the overlay uses, rendered to an offscreen texture instead of a window |
 | Desktop behind the dots | **a static mockup**, `Backdrop/backdrop.html` |
 
 So every dot position in `docs/demo.gif` is the genuine output of the shipping
@@ -25,10 +25,9 @@ rather than off a display link — so re-running produces an identical sequence.
 
 ## Settings used
 
-`Intensity: High` (80 pt of dot travel per g, against a 48 pt default), dots
-slightly larger and more opaque than default, so the movement survives video
-compression. Everything else is stock. Measured travel in the exported
-sequence: 55 px horizontal, 38 px vertical.
+`Intensity: High` (1400 pt/s² per g, against a 900 default), particles slightly
+larger and more opaque than default, so the field survives video compression.
+Everything else is stock.
 
 ## Regenerating
 

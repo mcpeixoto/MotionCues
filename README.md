@@ -18,11 +18,10 @@ direct link to your own iPhone.
 > nonetheless the genuine output of the shipping `MotionEngine` and
 > `LayerDotRenderer`, rendered offline frame by frame; only the desktop behind
 > the dots is a mockup. Intensity is set to High so the movement survives video
-> compression, and the faint rings mark each dot's rest position so the
-> displacement is legible — the dots are easier to see, they do not travel
-> further than they really would. The state panel is driven by the same
-> `VehicleMotion` the dots are. See [Tools/README.md](Tools/README.md) for
-> exactly how it is generated, and regenerate it yourself in three commands.
+> compression. The state panel is driven by the same `VehicleMotion` the
+> particles are, so it cannot disagree with them. See
+> [Tools/README.md](Tools/README.md) for exactly how it is generated, and
+> regenerate it yourself in three commands.
 
 > **Status:** works, and every claim in this README was measured rather than
 > assumed. It is a personal project: there are no signed or notarised builds,
@@ -223,46 +222,71 @@ few-degrees-per-minute gyro heading drift and copes with the phone being nudged.
 
 ### Visual mapping
 
-Dots follow the pseudo-force `f = −a`, which is how a loose object on the
-dashboard moves and what your vestibular system reports:
+The field follows the pseudo-force `f = −a`: it moves the way a loose object in
+the cabin moves, which is what your vestibular system is reporting.
 
-| Car does | Dots move |
+| Car does | Field does |
 |---|---|
-| accelerates | down |
-| brakes | up |
-| turns left | right |
-| turns right | left |
-| crests a rise | slightly down |
+| accelerates | expands outwards from the centre |
+| brakes | contracts inwards |
+| turns left | slides right |
+| turns right | slides left |
+| crests a rise | drifts down |
 
-But the dominant term is **velocity, not displacement**. The first version only
-offset each dot in proportion to instantaneous acceleration, and that is a weak
-cue: a firm brake is 0.3 g, which at the High setting is 24 points of travel,
-and 24 points that then spring back is close to invisible in peripheral vision —
-which is exactly where these dots live.
+Three things about that table are worth explaining, because two earlier
+versions of this got them wrong.
 
-What the visual system responds to is optic flow. So a dot's drift *speed* is
-proportional to acceleration. Standing still means no acceleration and therefore
-no flow at all, so the field is genuinely static at rest. A sustained brake
-produces continuous drift for as long as it lasts. Harder braking is faster,
-not merely further. Integrating acceleration gives a change in velocity, and
-matching flow speed to Δv is a closer analogue of what the inner ear reports
-than matching displacement to acceleration is.
+**It is velocity, not displacement.** The first version offset dots in
+proportion to instantaneous acceleration. A firm brake is 0.3 g, which came to
+about twenty points of travel that then sprang back — invisible in peripheral
+vision, which is exactly where the cue lives. What the visual system responds
+to is optic flow, so acceleration now drives the field's *speed*. Standing
+still means no acceleration, therefore no flow, therefore a completely static
+field — that part is a hard requirement and there is a test for it.
 
-The two axes are deliberately not symmetric:
+**It is radial, not vertical.** The second version streamed dots up and down
+the screen edges. But forward motion does not look like things sliding
+downwards; it looks like the world expanding past you, away from the point you
+are heading for. That is the actual optic-flow signature of translation. So the
+field has depth, the particles are projected through a pinhole, and
+accelerating pushes the whole field towards the viewer: particles spread out
+from the centre and grow, braking pulls them back in.
 
-* **Longitudinal** motion runs *along* the edge columns, where there is a whole
-  screen of room. Dots stream up or down continuously, fade out at the end of
-  the column and reappear at the other end, so a long manoeuvre never runs out
-  of flow and never leaves a gap.
-* **Lateral** motion runs *across* them, where there is almost none — a dot 40
-  points from the left edge has 40 points before it is off-screen. So cornering
-  is a bounded excursion that saturates smoothly against the room that
-  particular dot actually has, and relaxes back to the edge when the corner
-  ends. Letting it drift freely made the near column walk straight off the
-  screen for about a second during any sustained turn.
+**The grid wraps in all three axes**, so there is no edge to run out of. The
+second version had to bound sideways travel because dots ran off the screen
+during a sustained corner, and that asymmetry was a symptom of the model being
+wrong rather than of the screen being small. It is simply gone now.
 
-Travel is hard-clamped at 140 pt so a pothole can never fling a dot across the
-screen.
+Two other details:
+
+* **Every particle is drawn twice**, once light and once dark, slightly offset.
+  The overlay is not allowed to see what is behind it without Screen Recording
+  permission, so rather than guess the background, one of each pair is
+  guaranteed to contrast with it.
+* **The cue stays in your peripheral vision.** Particle opacity falls off with
+  distance from the screen edge, so the middle — where you are actually
+  reading — stays clear.
+
+The idea of a wrapping 3-D particle grid with perspective, motion trails and
+paired light/dark dots came from reading
+[EasyQueasy](https://github.com/Kalabasa/EasyQueasy) (Android, GPL-3.0). It is
+reimplemented here from the idea, not the code; MotionCues is MIT and contains
+no GPL material. [MacMotionCues](https://github.com/Lospi/MacMotionCues) is the
+other prior art worth knowing about on this platform.
+
+### Rendering
+
+One instanced Metal draw call for the whole field. Each particle is a quad
+stretched along its own motion, and the fragment shader measures distance to a
+line segment — a capsule, which degenerates to a circle when the particle is
+still. That gives the dot and its motion trail from a single primitive.
+
+The shader is compiled from source at launch rather than at build time, so the
+project needs no Metal Toolchain component. That matters: it is a large
+separate download that a fresh Xcode install and a CI runner do not have.
+
+The earlier CALayer-per-dot renderer was right for sixteen dots and wrong for a
+field of several hundred with trails and paired colours.
 
 ---
 
@@ -378,14 +402,22 @@ On an M4 MacBook Air at 1470×956, Release build:
 
 | Condition | CPU |
 |---|---|
-| Simulator source, 100 Hz sensor + 60 Hz render, 16 dots | ~4 % of one core |
-| Idle (no motion for 3 s — display links park themselves) | ~0.5 % |
+| Simulator source, 100 Hz sensor, full particle field | ~3–6 % of one core |
+| Idle (no motion for 3 s — display links park themselves) | ~1–2 % |
 
-Memory ~73 MB resident. Network traffic 7.6 kB/s while streaming.
+Getting there took measuring rather than guessing. A full-screen Metal overlay
+at native Retina resolution cost 9–18 %. Dropping the render resolution to
+1.25× brought it to 5–10 %; dropping it further to 1.0× did *not* help, which
+showed the cost was per-frame compositing rather than pixels. Varying the
+frame rate with how much is actually happening — 24 fps cruising, 60 under a
+hard brake — is what brought it down to 3–6 %.
+
+
+Memory ~76 MB resident. Network traffic 7.6 kB/s while streaming.
 
 ## Tests
 
-`xcodebuild ... test` runs 37 tests covering the parts that fail silently if
+`xcodebuild ... test` runs 43 tests covering the parts that fail silently if
 they are wrong:
 
 * wire format round-trips, and rejection of foreign, truncated and
@@ -400,8 +432,11 @@ they are wrong:
 * an end-to-end run of the engine against ground truth with an unknown phone
   orientation and an unknown car heading, checked by correlation and by
   axis cross-talk;
-* the sign of every dot movement, because getting one backwards would make
-  the app worse than nothing;
+* the particle field: silence at rest, radial expansion under acceleration and
+  contraction under braking, lateral slide in corners, a seamless wrap, bounded
+  particle counts on a 6K display, and that the cue stays in the periphery;
+* that the Metal shader actually compiles — it is built from source at launch,
+  so a syntax error would otherwise surface only as a silently missing overlay;
 * the real `MotionReceiver` over a real UDP socket on loopback: delivery,
   stale-packet rejection, garbage rejection, and the heartbeat.
 

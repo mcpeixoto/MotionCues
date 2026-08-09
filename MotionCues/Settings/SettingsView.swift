@@ -32,18 +32,16 @@ private struct AppearanceSettings: View {
     var body: some View {
         Form {
             Section {
-                Stepper(value: $settings.dotsPerEdge, in: 2...24) {
-                    LabeledContent("Dots per edge", value: "\(settings.dotsPerEdge)")
-                }
-                slider("Dot size", value: $settings.dotDiameter, range: 3...18, unit: "pt")
+                slider("Dot size", value: $settings.dotDiameter, range: 3...22, unit: "pt")
                 slider("Opacity", value: $settings.opacity, range: 0.05...1.0, unit: "")
-                slider("Distance from edge", value: $settings.edgeInset, range: 6...160, unit: "pt")
+                slider("How far in from the edge", value: $settings.peripherySize,
+                       range: 90...520, unit: "pt")
+            } footer: {
+                Text("The cue lives in your peripheral vision. The middle of the screen is left clear, because that is where you are reading.")
+                    .font(.caption).foregroundStyle(.secondary)
             }
 
             Section {
-                Picker("Placement", selection: $settings.placement) {
-                    ForEach(DotPlacement.allCases) { Text($0.displayName).tag($0) }
-                }
                 Picker("Contrast", selection: $settings.appearance) {
                     ForEach(CueAppearance.allCases) { Text($0.displayName).tag($0) }
                 }
@@ -52,7 +50,7 @@ private struct AppearanceSettings: View {
                 Toggle("Hide overlay from screenshots and screen sharing",
                        isOn: $settings.hideFromScreenCapture)
             } footer: {
-                Text("The overlay cannot read the pixels behind it without Screen Recording permission, so dot colour follows the system appearance. Each dot carries a contrasting halo so it stays visible either way.")
+                Text("The overlay cannot read what is behind it without Screen Recording permission. Rather than guess, every particle is drawn twice — once light, once dark, slightly offset — so whichever one contrasts with your content is the one you see.")
                     .font(.caption)
                     .foregroundStyle(.secondary)
             }
@@ -93,7 +91,7 @@ private struct MotionSettings: View {
                     ForEach(CueIntensity.allCases) { Text($0.displayName).tag($0) }
                 }
             } footer: {
-                Text("How far the dots travel per g of acceleration: \(Int(settings.intensity.gain)) pt.")
+                Text("How hard the car's motion drives the field: \(Int(settings.intensity.flowGain)) pt/s² per g. Start at Low.")
                     .font(.caption).foregroundStyle(.secondary)
             }
 

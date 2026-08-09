@@ -15,7 +15,7 @@ import QuartzCore
 
 final class OverlayView: NSView {
     private let state: MotionStateBox
-    private var renderer: LayerDotRenderer!
+    private var renderer: MetalDotRenderer?
     private var activeLink: CADisplayLink?
     private var settings: RenderSettings
     private var lastTick: CFTimeInterval = 0
@@ -30,16 +30,20 @@ final class OverlayView: NSView {
         self.settings = settings
         super.init(frame: .zero)
         wantsLayer = true
-        layer?.masksToBounds = false
+        layer?.masksToBounds = true
         layerContentsRedrawPolicy = .never
-        renderer = LayerDotRenderer(root: layer!)
+        if let renderer = MetalDotRenderer() {
+            self.renderer = renderer
+            layer?.addSublayer(renderer.layer)
+        }
     }
 
     @available(*, unavailable)
     required init?(coder: NSCoder) { fatalError("not used") }
 
     // AppKit's default is a flipped-if-you-say-so coordinate space; we keep
-    // the standard bottom-left origin so the maths in DotLayout reads normally.
+    // the standard bottom-left origin, which is also Metal's NDC convention,
+    // so the shader needs no vertical flip.
     override var isFlipped: Bool { false }
 
     // Belt and braces on top of the window's `ignoresMouseEvents`.
@@ -83,7 +87,7 @@ final class OverlayView: NSView {
         let isDark = effectiveAppearance.bestMatch(from: [.aqua, .darkAqua]) == .darkAqua
         layer?.contentsScale = scale
         layer?.frame = bounds
-        renderer.configure(settings: settings, size: bounds.size, scale: scale, isDark: isDark)
+        renderer?.configure(settings: settings, size: bounds.size, scale: scale, isDark: isDark)
     }
 
     // MARK: - Display link
@@ -117,11 +121,17 @@ final class OverlayView: NSView {
         lastTick = now
 
         let motion = state.load()
-        renderer.render(motion: motion, dt: dt)
+        renderer?.render(motion: motion, dt: dt)
+
+        // Ask for only as many frames as the current motion needs.
+        if let range = renderer?.preferredFrameRate,
+           link.preferredFrameRateRange.preferred != range.preferred {
+            link.preferredFrameRateRange = range
+        }
 
         // Park when nothing has moved for a while. The AppCoordinator calls
         // `wake()` as soon as a non-trivial sample shows up again.
-        if motion.magnitude < 0.004 && renderer.isSettled {
+        if motion.magnitude < 0.004 && (renderer?.isSettled ?? true) {
             idleFrames += 1
             if idleFrames > idleFramesBeforePark { link.isPaused = true }
         } else {

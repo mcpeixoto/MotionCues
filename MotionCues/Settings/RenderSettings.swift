@@ -20,25 +20,13 @@ enum CueIntensity: String, CaseIterable, Codable, Identifiable {
         }
     }
 
-    /// Screen points of dot travel per g of acceleration.
-    var gain: Double {
+    /// How hard vehicle acceleration drives the particle field, in points per
+    /// second squared per g. This is what Intensity really controls.
+    var flowGain: Double {
         switch self {
-        case .low: 26
-        case .medium: 48
-        case .high: 80
-        }
-    }
-}
-
-enum DotPlacement: String, CaseIterable, Codable, Identifiable {
-    case sides
-    case sidesAndTopBottom
-    var id: String { rawValue }
-
-    var displayName: String {
-        switch self {
-        case .sides: "Left & right only"
-        case .sidesAndTopBottom: "All four edges"
+        case .low: 520
+        case .medium: 900
+        case .high: 1400
         }
     }
 }
@@ -59,19 +47,15 @@ enum CueAppearance: String, CaseIterable, Codable, Identifiable {
 /// Immutable snapshot handed to the renderer. Copied once per settings change,
 /// never read through an observable object at frame rate.
 struct RenderSettings: Equatable {
-    var dotsPerEdge: Int = 8
-    var dotDiameter: Double = 7
-    var opacity: Double = 0.45
-    var edgeInset: Double = 26
-    var gain: Double = 48
-    var placement: DotPlacement = .sides
+    var dotDiameter: Double = 9
+    var opacity: Double = 0.55
     var appearance: CueAppearance = .automatic
     var verticalCues: Bool = true
-    var springOmega: Double = 18
     var idleFadeEnabled: Bool = true
-    /// Drift speed in points per second per g. The dominant cue — see DotFlow.
-    var flowGain: Double = 620
-    /// Maximum excursion across the column, in points. Small on purpose —
-    /// there is no room sideways. See DotFlow.
-    var flowAcrossLimit: Double = 90
+    /// Scales vehicle acceleration into the particle field's response.
+    /// Points per second squared per g. See ParticleField.
+    var flowGain: Double = 900
+    /// How far in from the screen edge the cue reaches, in points. The middle
+    /// is left clear because that is where you are trying to read.
+    var peripherySize: Double = 240
 }

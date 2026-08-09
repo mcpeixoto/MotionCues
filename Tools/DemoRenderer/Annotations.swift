@@ -8,34 +8,18 @@
 //  explain itself: you cannot tell what the dots are, what they are tracking,
 //  or that they moved at all.
 //
-//  Two annotations, both honest:
+//  One annotation: a state panel driven by the *same* `VehicleMotion` the
+//  particles are driven by, so it cannot disagree with them.
 //
-//  * Rest-position ticks. A faint mark at each dot's home position, so the
-//    displacement is legible instead of having to be remembered. The dots
-//    themselves are not exaggerated — the gain is the app's real High setting,
-//    80 pt per g. The ticks give the eye a reference; they do not inflate the
-//    motion.
-//  * A state panel driven by the *same* `VehicleMotion` the dots are driven
-//    by. It cannot disagree with them, because it is the same numbers.
+//  The rest-position rings the earlier cut used are gone. They existed because
+//  the old model nudged dots a few points from a fixed home and you needed a
+//  reference to see it at all. The field now flows, which is self-evidently
+//  motion, and fixed rings would be a lie about a field that has no home.
 //
 
 import AppKit
 
 enum Annotations {
-
-    // MARK: - Rest-position ticks
-
-    /// A faint ring at each dot's home position.
-    static func drawRestMarks(_ positions: [DotPosition], diameter: CGFloat, in ctx: CGContext) {
-        ctx.saveGState()
-        ctx.setStrokeColor(NSColor.white.withAlphaComponent(0.16).cgColor)
-        ctx.setLineWidth(1)
-        for p in positions {
-            let r = diameter * 0.72
-            ctx.strokeEllipse(in: CGRect(x: p.home.x - r, y: p.home.y - r, width: r * 2, height: r * 2))
-        }
-        ctx.restoreGState()
-    }
 
     // MARK: - State panel
 

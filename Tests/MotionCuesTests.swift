@@ -8,6 +8,7 @@
 
 import XCTest
 import simd
+import Metal
 @testable import MotionCues
 
 final class WireFormatTests: XCTestCase {
@@ -365,69 +366,6 @@ final class MotionEngineTests: XCTestCase {
     }
 }
 
-// MARK: - Visual mapping
-
-final class DotLayoutTests: XCTestCase {
-    private let settings: RenderSettings = {
-        var s = RenderSettings()
-        s.gain = 48
-        s.verticalCues = false
-        return s
-    }()
-
-    /// Dots follow the pseudo-force, i.e. they move the way a loose object on
-    /// the dashboard would. Getting these signs backwards would make the app
-    /// actively worse than nothing.
-    func testAcceleratingPushesDotsDown() {
-        let m = VehicleMotion(forward: 0.2, lateral: 0, vertical: 0, yawRate: 0, timestamp: 0)
-        XCTAssertLessThan(DotLayout.offset(for: m, settings: settings).y, 0)
-    }
-
-    func testBrakingPushesDotsUp() {
-        let m = VehicleMotion(forward: -0.2, lateral: 0, vertical: 0, yawRate: 0, timestamp: 0)
-        XCTAssertGreaterThan(DotLayout.offset(for: m, settings: settings).y, 0)
-    }
-
-    func testTurningLeftPushesDotsRight() {
-        // +lateral = accelerating leftwards = a left turn.
-        let m = VehicleMotion(forward: 0, lateral: 0.2, vertical: 0, yawRate: 0.3, timestamp: 0)
-        XCTAssertGreaterThan(DotLayout.offset(for: m, settings: settings).x, 0)
-    }
-
-    func testTurningRightPushesDotsLeft() {
-        let m = VehicleMotion(forward: 0, lateral: -0.2, vertical: 0, yawRate: -0.3, timestamp: 0)
-        XCTAssertLessThan(DotLayout.offset(for: m, settings: settings).x, 0)
-    }
-
-    func testTravelIsClamped() {
-        let violent = VehicleMotion(forward: 40, lateral: -40, vertical: 0, yawRate: 0, timestamp: 0)
-        let offset = DotLayout.offset(for: violent, settings: settings)
-        XCTAssertLessThanOrEqual(abs(offset.x), 140)
-        XCTAssertLessThanOrEqual(abs(offset.y), 140)
-    }
-
-    func testDotCountMatchesPlacement() {
-        var s = RenderSettings()
-        s.dotsPerEdge = 8
-        s.placement = .sides
-        XCTAssertEqual(DotLayout.positions(in: CGSize(width: 1440, height: 900), settings: s).count, 16)
-        s.placement = .sidesAndTopBottom
-        XCTAssertEqual(DotLayout.positions(in: CGSize(width: 1440, height: 900), settings: s).count, 32)
-    }
-
-    func testDotsStayInsideTheScreen() {
-        var s = RenderSettings()
-        s.dotsPerEdge = 10
-        s.edgeInset = 30
-        s.placement = .sidesAndTopBottom
-        let size = CGSize(width: 1440, height: 900)
-        for p in DotLayout.positions(in: size, settings: s) {
-            XCTAssertTrue((0...size.width).contains(p.home.x))
-            XCTAssertTrue((0...size.height).contains(p.home.y))
-        }
-    }
-}
-
 // MARK: - Rate meter
 
 final class RateMeterTests: XCTestCase {
@@ -450,183 +388,212 @@ final class RateMeterTests: XCTestCase {
     }
 }
 
-// MARK: - Flow model
+// MARK: - Particle field
 
-/// The flow model is the dominant cue, so its properties matter more than the
-/// instantaneous offset's: silent at rest, continuous under a sustained
-/// manoeuvre, never a gap, and never a dot stranded off-screen.
-final class DotFlowTests: XCTestCase {
+/// The field is the cue. What has to hold: nothing at rest, radial expansion
+/// under acceleration, contraction under braking, lateral slide in corners,
+/// a seamless wrap, and no unbounded growth.
+final class ParticleFieldTests: XCTestCase {
     private var settings: RenderSettings {
         var s = RenderSettings()
-        s.flowGain = 620
-        s.flowAcrossLimit = 90
+        s.flowGain = 900
+        s.dotDiameter = 9
+        s.opacity = 1
+        s.peripherySize = 240
         s.verticalCues = false
         return s
     }
-    private let band = 380.0        // half of 0.8 × 956 pt, a typical screen
+    private let viewport = CGSize(width: 1470, height: 956)
 
-    func testNoFlowAtRest() {
-        let v = DotFlow.speed(for: .zero, settings: settings)
-        XCTAssertEqual(v.along, 0, accuracy: 1e-9)
-        XCTAssertEqual(v.across, 0, accuracy: 1e-9)
-    }
-
-    /// Same convention as the static offset: dots follow the pseudo-force.
-    func testFlowFollowsThePseudoForce() {
-        let accelerating = VehicleMotion(forward: 0.2, lateral: 0, vertical: 0, yawRate: 0, timestamp: 0)
-        XCTAssertLessThan(DotFlow.speed(for: accelerating, settings: settings).along, 0)
-
-        let braking = VehicleMotion(forward: -0.2, lateral: 0, vertical: 0, yawRate: 0, timestamp: 0)
-        XCTAssertGreaterThan(DotFlow.speed(for: braking, settings: settings).along, 0)
-
-        let left = VehicleMotion(forward: 0, lateral: 0.2, vertical: 0, yawRate: 0.3, timestamp: 0)
-        XCTAssertGreaterThan(DotFlow.speed(for: left, settings: settings).across, 0)
-    }
-
-    func testFlowSpeedIsCapped() {
-        let violent = VehicleMotion(forward: 12, lateral: -12, vertical: 0, yawRate: 0, timestamp: 0)
-        let v = DotFlow.speed(for: violent, settings: settings)
-        XCTAssertLessThanOrEqual(abs(v.along), settings.flowGain * 0.8 + 1e-6)
-        XCTAssertLessThanOrEqual(abs(v.across), settings.flowGain * 0.8 + 1e-6)
-    }
-
-    /// The whole point: a dot must keep moving under a sustained brake instead
-    /// of hopping once and stopping.
-    func testSustainedBrakingKeepsProducingFlow() {
-        var flow = DotFlowState(phase: 0.5)
-        var travelled = 0.0
-        var wraps = 0
-        var previous = flow.offset.y
-
-        for _ in 0..<300 {              // 5 s at 60 fps
-            flow.step(alongSpeed: 200, acrossSpeed: 0, band: band,
-                      acrossLimit: settings.flowAcrossLimit,
-                      acrossLimitNegative: settings.flowAcrossLimit, dt: 1.0 / 60.0)
-            let y = Double(flow.offset.y)
-            if y < previous { wraps += 1 } else { travelled += y - previous }
-            previous = y
+    private func run(_ motion: VehicleMotion, seconds: Double,
+                     field: ParticleField = ParticleField()) -> ParticleField {
+        var f = field
+        for _ in 0..<Int(seconds * 60) {
+            f.update(motion: motion, settings: settings, dt: 1.0 / 60.0)
         }
-        // 5 s at 200 pt/s is 1000 pt of flow; the column is 760 pt, so it must
-        // have wrapped at least once and kept going.
-        XCTAssertGreaterThan(wraps, 0, "flow ran out instead of wrapping")
-        XCTAssertGreaterThan(travelled + Double(wraps) * band * 2, 900)
+        return f
     }
 
-    /// The wrap must happen while the dot is invisible.
-    func testDotIsInvisibleWhenItWraps() {
-        var flow = DotFlowState(phase: 0.0)
-        var previous = Double(flow.offset.y)
+    // MARK: Rest
+
+    /// A parked car must show a completely static field, and then nothing.
+    func testRestProducesNothing() {
+        let f = run(.zero, seconds: 10)
+        XCTAssertEqual(simd_length(f.velocity), 0, accuracy: 1e-6)
+        XCTAssertLessThan(f.intensity, 0.01)
+
+        var drew = 0
+        f.forEachParticle(viewport: viewport, settings: settings) { _ in drew += 1 }
+        XCTAssertEqual(drew, 0, "the field drew something on a stationary car")
+    }
+
+    /// And it must come back to rest after a manoeuvre, not drift forever.
+    func testFieldSettlesAfterAManoeuvre() {
+        var f = run(VehicleMotion(forward: 0.25, lateral: 0, vertical: 0, yawRate: 0, timestamp: 0),
+                    seconds: 4)
+        XCTAssertGreaterThan(f.intensity, 0.3)
+        f = run(.zero, seconds: 25, field: f)
+        XCTAssertLessThan(simd_length(f.velocity), 0.5, "the field never stopped")
+        XCTAssertLessThan(f.intensity, 0.02, "the cue never faded out")
+    }
+
+    // MARK: Direction
+
+    /// Accelerating is radial expansion: particles move away from the centre.
+    /// This is the whole reason the model has depth.
+    func testAcceleratingExpandsTheFieldOutwards() {
+        let f = run(VehicleMotion(forward: 0.25, lateral: 0, vertical: 0, yawRate: 0, timestamp: 0),
+                    seconds: 2)
+        XCTAssertGreaterThan(f.velocity.z, 50, "the field is not coming towards the viewer")
+
+        // Particles must be moving away from the screen centre on average.
+        let centre = CGPoint(x: viewport.width / 2, y: viewport.height / 2)
+        var outward = 0, inward = 0
+        f.forEachParticle(viewport: viewport, settings: settings) { p in
+            let now = hypot(p.position.x - centre.x, p.position.y - centre.y)
+            let before = hypot(p.previous.x - centre.x, p.previous.y - centre.y)
+            if now > before { outward += 1 } else if now < before { inward += 1 }
+        }
+        XCTAssertGreaterThan(outward, 0, "no particles drawn")
+        XCTAssertGreaterThan(Double(outward) / Double(outward + inward), 0.85,
+                             "acceleration should expand the field, not slide it")
+    }
+
+    func testBrakingContractsTheField() {
+        let f = run(VehicleMotion(forward: -0.25, lateral: 0, vertical: 0, yawRate: 0, timestamp: 0),
+                    seconds: 2)
+        XCTAssertLessThan(f.velocity.z, -50)
+
+        let centre = CGPoint(x: viewport.width / 2, y: viewport.height / 2)
+        var inward = 0, outward = 0
+        f.forEachParticle(viewport: viewport, settings: settings) { p in
+            let now = hypot(p.position.x - centre.x, p.position.y - centre.y)
+            let before = hypot(p.previous.x - centre.x, p.previous.y - centre.y)
+            if now < before { inward += 1 } else if now > before { outward += 1 }
+        }
+        XCTAssertGreaterThan(inward, 0)
+        XCTAssertGreaterThan(Double(inward) / Double(inward + outward), 0.85)
+    }
+
+    /// Turning left slides the field right — same pseudo-force convention as
+    /// everything else.
+    func testTurningSlidesTheFieldSideways() {
+        let left = run(VehicleMotion(forward: 0, lateral: 0.2, vertical: 0, yawRate: 0.3, timestamp: 0),
+                       seconds: 2)
+        XCTAssertGreaterThan(left.velocity.x, 30)
+
+        let right = run(VehicleMotion(forward: 0, lateral: -0.2, vertical: 0, yawRate: -0.3, timestamp: 0),
+                        seconds: 2)
+        XCTAssertLessThan(right.velocity.x, -30)
+    }
+
+    // MARK: Behaviour under load
+
+    /// The old model had to bound lateral travel because dots ran out of
+    /// screen. A wrapping field must not: twenty seconds of hard cornering
+    /// keeps flowing and stays bounded in state.
+    func testSustainedCorneringNeverRunsOutOfRoom() {
+        let f = run(VehicleMotion(forward: 0, lateral: 0.3, vertical: 0, yawRate: 0.4, timestamp: 0),
+                    seconds: 20)
+        XCTAssertGreaterThan(f.intensity, 0.5, "the cue faded out during a sustained corner")
+        // Offsets are wrapped, so they stay inside one cell however long it runs.
+        XCTAssertLessThan(abs(f.offset.x), f.cellX + 1e-6)
+        XCTAssertGreaterThan(abs(f.velocity.x), 30, "flow stalled")
+
+        var count = 0
+        f.forEachParticle(viewport: viewport, settings: settings) { _ in count += 1 }
+        XCTAssertGreaterThan(count, 20, "the field emptied out")
+    }
+
+    func testVelocityIsBoundedUnderAbsurdInput() {
+        let f = run(VehicleMotion(forward: 40, lateral: -40, vertical: 20, yawRate: 9, timestamp: 0),
+                    seconds: 30)
+        XCTAssertTrue(simd_length(f.velocity).isFinite)
+        // Terminal velocity is set by the acceleration cap over the friction.
+        XCTAssertLessThan(simd_length(f.velocity), settings.flowGain * 1.2)
+    }
+
+    /// Particle count must not explode with viewport size, or a 6K display
+    /// would melt.
+    func testParticleCountStaysBounded() {
+        let f = run(VehicleMotion(forward: 0.3, lateral: 0.2, vertical: 0, yawRate: 0.2, timestamp: 0),
+                    seconds: 3)
+        for size in [CGSize(width: 1470, height: 956),
+                     CGSize(width: 3840, height: 2160),
+                     CGSize(width: 6016, height: 3384)] {
+            var count = 0
+            f.forEachParticle(viewport: size, settings: settings) { _ in count += 1 }
+            XCTAssertGreaterThan(count, 10, "no particles at \(size)")
+            XCTAssertLessThan(count, 4000, "runaway particle count at \(size): \(count)")
+        }
+    }
+
+    /// The middle of the screen is where you are reading; the cue belongs at
+    /// the edges.
+    func testParticlesStayInThePeriphery() {
+        let f = run(VehicleMotion(forward: 0.3, lateral: 0, vertical: 0, yawRate: 0, timestamp: 0),
+                    seconds: 3)
+        let w = Double(viewport.width), h = Double(viewport.height)
+        var maxEdgeDistance = 0.0
+        var strongCount = 0
+        f.forEachParticle(viewport: viewport, settings: settings) { p in
+            guard p.alpha > 0.25 else { return }
+            strongCount += 1
+            maxEdgeDistance = max(maxEdgeDistance,
+                                  ParticleField.edgeDistance(x: Double(p.position.x),
+                                                             y: Double(p.position.y),
+                                                             width: w, height: h))
+        }
+        XCTAssertGreaterThan(strongCount, 0)
+        XCTAssertLessThan(maxEdgeDistance, settings.peripherySize,
+                          "a strongly visible particle was in the middle of the screen")
+    }
+
+    // MARK: Maths
+
+    func testWrapAndShortest() {
+        XCTAssertEqual(ParticleField.wrap(-1, 10), 9, accuracy: 1e-9)
+        XCTAssertEqual(ParticleField.wrap(23, 10), 3, accuracy: 1e-9)
+        XCTAssertEqual(ParticleField.shortest(9, 10), -1, accuracy: 1e-9)
+        XCTAssertEqual(ParticleField.shortest(-9, 10), 1, accuracy: 1e-9)
+        XCTAssertEqual(ParticleField.shortest(2, 10), 2, accuracy: 1e-9)
+    }
+
+    /// The trail must never stretch across the whole screen when the field
+    /// wraps — that was a visible artefact before `shortest` was applied.
+    func testTrailStaysShortAcrossAWrap() {
+        var f = ParticleField()
+        var worst = 0.0
         for _ in 0..<600 {
-            flow.step(alongSpeed: 200, acrossSpeed: 0, band: band,
-                      acrossLimit: settings.flowAcrossLimit,
-                      acrossLimitNegative: settings.flowAcrossLimit, dt: 1.0 / 60.0)
-            let y = Double(flow.offset.y)
-            if y < previous {           // just wrapped
-                XCTAssertLessThan(flow.envelope(band: band), 0.05,
-                                  "the dot jumped while still visible")
-                return
-            }
-            previous = y
-        }
-        XCTFail("never wrapped")
-    }
-
-    /// A dot must never end up further sideways than the screen allows —
-    /// letting it drift freely made the right-hand column disappear.
-    func testLateralExcursionIsBounded() {
-        var flow = DotFlowState(phase: 0.4)
-        for _ in 0..<1200 {             // 20 s of hard, sustained cornering
-            flow.step(alongSpeed: 0, acrossSpeed: 400, band: band,
-                      acrossLimit: settings.flowAcrossLimit,
-                      acrossLimitNegative: settings.flowAcrossLimit, dt: 1.0 / 60.0)
-        }
-        XCTAssertLessThanOrEqual(Double(flow.offset.x), settings.flowAcrossLimit + 1e-6)
-        XCTAssertGreaterThan(Double(flow.offset.x), settings.flowAcrossLimit * 0.5,
-                             "the excursion should saturate near the limit, not collapse")
-    }
-
-    /// When the corner ends the field must come home, not stay displaced.
-    func testLateralExcursionDecaysBack() {
-        var flow = DotFlowState(phase: 0.4)
-        for _ in 0..<300 {
-            flow.step(alongSpeed: 0, acrossSpeed: 400, band: band,
-                      acrossLimit: settings.flowAcrossLimit,
-                      acrossLimitNegative: settings.flowAcrossLimit, dt: 1.0 / 60.0)
-        }
-        XCTAssertGreaterThan(Double(flow.offset.x), 40)
-        for _ in 0..<600 {              // 10 s straight afterwards
-            flow.step(alongSpeed: 0, acrossSpeed: 0, band: band,
-                      acrossLimit: settings.flowAcrossLimit,
-                      acrossLimitNegative: settings.flowAcrossLimit, dt: 1.0 / 60.0)
-        }
-        XCTAssertLessThan(abs(Double(flow.offset.x)), 2, "the field never returned to the edge")
-    }
-
-    /// The real bug this replaced: with a uniform sideways limit, the column
-    /// nearest the direction of drift walked straight off the screen.
-    func testExcursionRespectsTheRoomTheDotActuallyHas() {
-        var flow = DotFlowState(phase: 0.4)
-        // A dot 40 pt from the left edge: plenty of room right, almost none left.
-        for _ in 0..<900 {
-            flow.step(alongSpeed: 0, acrossSpeed: -400, band: band,
-                      acrossLimit: 90, acrossLimitNegative: 25, dt: 1.0 / 60.0)
-        }
-        XCTAssertGreaterThanOrEqual(Double(flow.offset.x), -25 - 1e-6,
-                                    "the dot walked off the near edge")
-    }
-
-    func testDotLayoutGivesEdgeDotsTheirRealRoom() {
-        var s = RenderSettings()
-        s.dotsPerEdge = 4
-        s.edgeInset = 40
-        s.dotDiameter = 10
-        let size = CGSize(width: 1470, height: 956)
-        let dots = DotLayout.positions(in: size, settings: s)
-
-        let left = try! XCTUnwrap(dots.first { $0.edge == .left })
-        XCTAssertEqual(left.acrossRoom.negative, 30, accuracy: 0.001)   // 40 − 10
-        XCTAssertGreaterThan(left.acrossRoom.positive, 1000)
-
-        let right = try! XCTUnwrap(dots.first { $0.edge == .right })
-        XCTAssertEqual(right.acrossRoom.positive, 30, accuracy: 0.001)
-        XCTAssertGreaterThan(right.acrossRoom.negative, 1000)
-
-        // Side dots stream vertically; top/bottom dots stream horizontally.
-        XCTAssertTrue(left.edge.isVertical)
-        s.placement = .sidesAndTopBottom
-        let all = DotLayout.positions(in: size, settings: s)
-        XCTAssertFalse(try! XCTUnwrap(all.first { $0.edge == .top }).edge.isVertical)
-    }
-
-    /// A parked car must not shimmer.
-    func testRestIsStaticAndFullyVisible() {
-        var flow = DotFlowState(phase: 0.3)
-        for _ in 0..<600 {
-            flow.step(alongSpeed: 0, acrossSpeed: 0, band: band,
-                      acrossLimit: settings.flowAcrossLimit,
-                      acrossLimitNegative: settings.flowAcrossLimit, dt: 1.0 / 60.0)
-        }
-        XCTAssertEqual(Double(flow.offset.y), 0, accuracy: 1e-9)
-        XCTAssertEqual(Double(flow.offset.x), 0, accuracy: 1e-9)
-        XCTAssertEqual(flow.envelope(band: band), 1.0, accuracy: 1e-9)
-    }
-
-    /// Dots must not all fade on the same frame, or the field strobes.
-    func testFadingIsStaggeredAcrossDots() {
-        var flows = (0..<14).map { DotFlowState(phase: Double(($0 &* 7919) % 1000) / 1000.0) }
-        var firstFadeFrame: [Int: Int] = [:]
-        for frame in 0..<600 {
-            for i in flows.indices {
-                flows[i].step(alongSpeed: 150, acrossSpeed: 0, band: band,
-                              acrossLimit: settings.flowAcrossLimit,
-                      acrossLimitNegative: settings.flowAcrossLimit, dt: 1.0 / 60.0)
-                if flows[i].envelope(band: band) < 0.5, firstFadeFrame[i] == nil {
-                    firstFadeFrame[i] = frame
-                }
+            f.update(motion: VehicleMotion(forward: 0.35, lateral: 0.25, vertical: 0,
+                                           yawRate: 0.3, timestamp: 0),
+                     settings: settings, dt: 1.0 / 60.0)
+            f.forEachParticle(viewport: viewport, settings: settings) { p in
+                worst = max(worst, hypot(p.position.x - p.previous.x, p.position.y - p.previous.y))
             }
         }
-        XCTAssertEqual(firstFadeFrame.count, flows.count, "some dots never faded")
-        XCTAssertGreaterThan(Set(firstFadeFrame.values).count, 5,
-                             "dots faded in lockstep — the field would strobe")
+        XCTAssertLessThan(worst, 160, "a trail spanned \(worst) pt — the wrap leaked into it")
+    }
+}
+
+// MARK: - Shader
+
+final class ShaderTests: XCTestCase {
+    /// The shader is compiled from source at launch, so a syntax error would
+    /// otherwise only show up as a silently missing overlay.
+    func testShaderCompiles() throws {
+        guard let device = MTLCreateSystemDefaultDevice() else {
+            throw XCTSkip("no Metal device on this machine")
+        }
+        let library = try device.makeLibrary(source: ParticleShaders.source, options: nil)
+        XCTAssertNotNil(library.makeFunction(name: "particle_vertex"))
+        XCTAssertNotNil(library.makeFunction(name: "particle_fragment"))
+    }
+
+    func testRendererBuildsItsPipeline() throws {
+        guard MTLCreateSystemDefaultDevice() != nil else {
+            throw XCTSkip("no Metal device on this machine")
+        }
+        XCTAssertNotNil(MetalDotRenderer(), "the render pipeline failed to build")
     }
 }
