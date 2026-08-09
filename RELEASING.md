@@ -36,6 +36,20 @@ TEAM_ID="TEAMID"
 NOTARY_PROFILE="MotionCuesNotary"
 ```
 
+## Authorise the signing key first (once)
+
+The first time `codesign` uses the Developer ID key it triggers a keychain
+authorisation dialog. From a terminal that dialog is easy to miss, and
+`codesign` simply hangs forever waiting for it — no error, no timeout, and a
+stray `MotionCues.cstemp` left in the bundle. If a release build seems to stall
+at the signing step, that is what happened.
+
+Get it out of the way with any small file, and click **Always Allow**:
+
+```bash
+codesign --force --sign "Developer ID Application: Your Name (TEAMID)" /tmp/probe
+```
+
 ## Making a release
 
 ```bash

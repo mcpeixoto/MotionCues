@@ -72,6 +72,19 @@ fi
 
 command -v xcodegen >/dev/null || { echo "error: xcodegen not installed (brew install xcodegen)" >&2; exit 1; }
 
+# The first use of a signing key pops a keychain dialog, and codesign blocks on
+# it forever with no error. Fail fast and say so instead of appearing to hang.
+if ! echo "probe" > "$TMPDIR/mc-sign-probe" \
+   || ! timeout 20 codesign --force --sign "$DEVELOPER_ID" "$TMPDIR/mc-sign-probe" 2>/dev/null; then
+  echo "error: could not use the signing key within 20s." >&2
+  echo "       macOS is probably showing a keychain authorisation dialog." >&2
+  echo "       Run this, click 'Always Allow', then try again:" >&2
+  echo "         codesign --force --sign \"$DEVELOPER_ID\" /tmp/probe" >&2
+  rm -f "$TMPDIR/mc-sign-probe"
+  exit 1
+fi
+rm -f "$TMPDIR/mc-sign-probe"
+
 # A dirty tree means the artefact does not correspond to any commit, which
 # makes the release unreproducible and the version tag a lie.
 if [[ -n "$(git status --porcelain)" ]]; then
