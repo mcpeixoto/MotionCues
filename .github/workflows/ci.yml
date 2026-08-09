@@ -1,0 +1,69 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  test:
+    name: Build & test
+    runs-on: macos-15
+    steps:
+      - uses: actions/checkout@v4
+
+      # Don't pin an exact Xcode path — runner images rename it every release.
+      # Take the newest installed.
+      - name: Select the newest Xcode
+        run: |
+          latest="$(ls -d /Applications/Xcode*.app | sort -V | tail -1)"
+          echo "Using $latest"
+          sudo xcode-select -s "$latest"
+          xcodebuild -version
+
+      # project.yml is the source of truth; the .xcodeproj is generated and
+      # deliberately not committed.
+      - name: Generate the Xcode project
+        run: |
+          brew install xcodegen xcbeautify
+          xcodegen generate
+
+      # The macOS tests are app-hosted. GitHub's macOS runners have a window
+      # server session, so AppKit comes up normally. LinkTests bind UDP on
+      # loopback and never advertise over Bonjour, precisely so CI needs no
+      # Local Network permission.
+      - name: Test (macOS)
+        run: |
+          set -o pipefail
+          xcodebuild -project MotionCues.xcodeproj \
+                     -scheme MotionCues \
+                     -configuration Debug \
+                     -destination 'platform=macOS' \
+                     test | xcbeautify --renderer github-actions
+        shell: bash
+
+      - name: Build (iOS companion)
+        run: |
+          set -o pipefail
+          xcodebuild -project MotionCues.xcodeproj \
+                     -scheme MotionCuesIOS \
+                     -configuration Release \
+                     -sdk iphonesimulator \
+                     CODE_SIGNING_ALLOWED=NO \
+                     build | xcbeautify --renderer github-actions
+        shell: bash
+
+      - name: Build (macOS, Release)
+        run: |
+          set -o pipefail
+          xcodebuild -project MotionCues.xcodeproj \
+                     -scheme MotionCues \
+                     -configuration Release \
+                     -destination 'platform=macOS' \
+                     build | xcbeautify --renderer github-actions
+        shell: bash

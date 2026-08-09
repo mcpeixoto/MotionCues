@@ -1,0 +1,57 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+	<key>CFBundleDevelopmentRegion</key>
+	<string>en</string>
+	<key>CFBundleExecutable</key>
+	<string>$(EXECUTABLE_NAME)</string>
+	<key>CFBundleIdentifier</key>
+	<string>$(PRODUCT_BUNDLE_IDENTIFIER)</string>
+	<key>CFBundleInfoDictionaryVersion</key>
+	<string>6.0</string>
+	<key>CFBundleName</key>
+	<string>$(PRODUCT_NAME)</string>
+	<key>CFBundlePackageType</key>
+	<string>APPL</string>
+	<key>CFBundleShortVersionString</key>
+	<string>1.0</string>
+	<key>CFBundleVersion</key>
+	<string>1</string>
+
+	<key>UILaunchScreen</key>
+	<dict/>
+	<key>UISupportedInterfaceOrientations</key>
+	<array>
+		<string>UIInterfaceOrientationPortrait</string>
+		<string>UIInterfaceOrientationLandscapeLeft</string>
+		<string>UIInterfaceOrientationLandscapeRight</string>
+	</array>
+
+	<!-- Core Motion device motion. -->
+	<key>NSMotionUsageDescription</key>
+	<string>MotionCues reads accelerometer and gyroscope data to describe the car's movement to your Mac. It is sent only to your Mac, over your local network.</string>
+
+	<!-- Bonjour discovery + UDP to the Mac. Required from iOS 14 on. -->
+	<key>NSLocalNetworkUsageDescription</key>
+	<string>MotionCues finds your Mac on the local network and streams motion data straight to it. Nothing is sent to the Internet.</string>
+	<key>NSBonjourServices</key>
+	<array>
+		<string>_mcues._udp</string>
+	</array>
+
+	<!-- Optional: GPS speed, used to compensate for body roll in corners. -->
+	<key>NSLocationWhenInUseUsageDescription</key>
+	<string>MotionCues can use your speed to tell cornering apart from the car leaning. Location never leaves your devices, and this is optional.</string>
+	<key>NSLocationAlwaysAndWhenInUseUsageDescription</key>
+	<string>Allows MotionCues to keep streaming with the screen off during a journey. Optional.</string>
+
+	<!-- The ONLY background mode that legitimately applies here, and only when
+	     the user turns GPS speed on: without it iOS suspends the app and Core
+	     Motion stops the moment the screen locks. -->
+	<key>UIBackgroundModes</key>
+	<array>
+		<string>location</string>
+	</array>
+</dict>
+</plist>

@@ -1,0 +1,109 @@
+//
+//  DotLayout.swift
+//
+//  Where the dots live at rest, and how vehicle acceleration turns into screen
+//  displacement.
+//
+//  The mapping is the whole point of the app, so it is worth being explicit
+//  about the physics.
+//
+//  A loose object on the dashboard does not move in the direction the car
+//  accelerates — it appears to move *opposite* to it, because it keeps its
+//  velocity while the car changes. That apparent motion is exactly what your
+//  vestibular system reports. So the dots follow the pseudo-force  f = −a :
+//
+//      car accelerates forward   → dots slide DOWN  (backwards, "into" you)
+//      car brakes                → dots slide UP    (forwards)
+//      car turns LEFT            → dots slide RIGHT
+//      car turns RIGHT           → dots slide LEFT
+//      car goes over a crest     → dots slide DOWN slightly
+//
+//  Screen axes here are AppKit's: +x right, +y up.
+//  Vehicle axes are: +x forward, +y left, +z up.
+//
+//      screenX = +gain * lateral
+//      screenY = -gain * forward
+//
+
+import Foundation
+import CoreGraphics
+
+struct DotPosition {
+    var home: CGPoint
+    /// 0.85…1.15, a small deterministic per-dot gain so the field breathes
+    /// instead of sliding as one rigid slab.
+    var gainScale: Double
+    /// 0.85…1.0, per-dot spring stiffness scale for a subtle stagger.
+    var springScale: Double
+}
+
+enum DotLayout {
+    /// Home positions in the view's coordinate space (points, origin
+    /// bottom-left, as AppKit gives us).
+    static func positions(in size: CGSize, settings: RenderSettings) -> [DotPosition] {
+        var result: [DotPosition] = []
+        let n = max(2, min(40, settings.dotsPerEdge))
+        let inset = settings.edgeInset
+
+        func column(x: CGFloat) {
+            // Spread over the middle 80% of the edge; the extreme corners are
+            // where the eye is least sensitive and where menu bars live.
+            let usable = size.height * 0.8
+            let start = (size.height - usable) / 2
+            for i in 0..<n {
+                let t = n == 1 ? 0.5 : Double(i) / Double(n - 1)
+                let y = start + usable * t
+                result.append(make(CGPoint(x: x, y: y), index: result.count))
+            }
+        }
+
+        func row(y: CGFloat) {
+            let usable = size.width * 0.8
+            let start = (size.width - usable) / 2
+            for i in 0..<n {
+                let t = n == 1 ? 0.5 : Double(i) / Double(n - 1)
+                let x = start + usable * t
+                result.append(make(CGPoint(x: x, y: y), index: result.count))
+            }
+        }
+
+        column(x: inset)
+        column(x: size.width - inset)
+
+        if settings.placement == .sidesAndTopBottom {
+            row(y: inset)
+            row(y: size.height - inset)
+        }
+
+        return result
+    }
+
+    private static func make(_ point: CGPoint, index: Int) -> DotPosition {
+        // Deterministic pseudo-random variation — same layout every launch.
+        let h = Double((index &* 2_654_435_761) % 1000) / 1000.0
+        let h2 = Double((index &* 40_503 &+ 17) % 1000) / 1000.0
+        return DotPosition(home: point,
+                           gainScale: 0.85 + 0.3 * h,
+                           springScale: 0.85 + 0.15 * h2)
+    }
+
+    /// Vehicle acceleration → screen offset in points.
+    static func offset(for motion: VehicleMotion, settings: RenderSettings) -> CGPoint {
+        let x = settings.gain * motion.lateral
+        var y = -settings.gain * motion.forward
+        if settings.verticalCues {
+            // Vertical acceleration also reads as apparent downward motion,
+            // but it is a much smaller and much noisier channel, so it only
+            // gets a third of the gain.
+            y += -settings.gain * 0.33 * motion.vertical
+        }
+        return CGPoint(x: clamp(x), y: clamp(y))
+    }
+
+    /// Hard travel limit so a pothole spike can never fling a dot across the
+    /// screen. 1.6 g of longitudinal acceleration is already beyond anything a
+    /// road car does.
+    private static func clamp(_ v: Double) -> CGFloat {
+        CGFloat(max(-140, min(140, v)))
+    }
+}

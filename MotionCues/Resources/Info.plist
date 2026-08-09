@@ -1,0 +1,41 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+	<key>CFBundleDevelopmentRegion</key>
+	<string>en</string>
+	<key>CFBundleExecutable</key>
+	<string>$(EXECUTABLE_NAME)</string>
+	<key>CFBundleIdentifier</key>
+	<string>$(PRODUCT_BUNDLE_IDENTIFIER)</string>
+	<key>CFBundleInfoDictionaryVersion</key>
+	<string>6.0</string>
+	<key>CFBundleName</key>
+	<string>$(PRODUCT_NAME)</string>
+	<key>CFBundlePackageType</key>
+	<string>APPL</string>
+	<key>CFBundleShortVersionString</key>
+	<string>1.0</string>
+	<key>CFBundleVersion</key>
+	<string>1</string>
+	<key>LSMinimumSystemVersion</key>
+	<string>$(MACOSX_DEPLOYMENT_TARGET)</string>
+
+	<!-- Menu-bar-only: no Dock icon, no app menu, never becomes the active app. -->
+	<key>LSUIElement</key>
+	<true/>
+
+	<!-- Required before CMHeadphoneMotionManager will deliver anything.
+	     Shown in the Motion & Fitness permission prompt. -->
+	<key>NSMotionUsageDescription</key>
+	<string>MotionCues reads head motion from AirPods as a fallback source of vehicle movement when no iPhone is connected. The data never leaves this Mac.</string>
+
+	<!-- macOS asks for Local Network access before Bonjour/UDP will work. -->
+	<key>NSLocalNetworkUsageDescription</key>
+	<string>MotionCues receives motion data directly from your iPhone over the local network. Nothing is sent to the Internet.</string>
+	<key>NSBonjourServices</key>
+	<array>
+		<string>_mcues._udp</string>
+	</array>
+</dict>
+</plist>
