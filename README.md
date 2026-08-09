@@ -18,8 +18,11 @@ direct link to your own iPhone.
 > nonetheless the genuine output of the shipping `MotionEngine` and
 > `LayerDotRenderer`, rendered offline frame by frame; only the desktop behind
 > the dots is a mockup. Intensity is set to High so the movement survives video
-> compression. See [Tools/README.md](Tools/README.md) for exactly how it is
-> generated, and regenerate it yourself in three commands.
+> compression, and the faint rings mark each dot's rest position so the
+> displacement is legible — the dots are easier to see, they do not travel
+> further than they really would. The state panel is driven by the same
+> `VehicleMotion` the dots are. See [Tools/README.md](Tools/README.md) for
+> exactly how it is generated, and regenerate it yourself in three commands.
 
 > **Status:** works, and every claim in this README was measured rather than
 > assumed. It is a personal project: there are no signed or notarised builds,

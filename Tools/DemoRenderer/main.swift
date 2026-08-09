@@ -61,10 +61,14 @@ try? FileManager.default.createDirectory(at: outputDir, withIntermediateDirector
 // MARK: - The real pipeline
 
 var settings = RenderSettings()
-settings.dotsPerEdge = 9
-settings.dotDiameter = 9
-settings.opacity = 0.62
-settings.edgeInset = 34
+// Bigger and more opaque than the app's defaults, because a 9 pt dot at 45%
+// opacity disappears in a compressed, autoplaying timeline video. The *gain*
+// is untouched at the app's real High setting — the dots are easier to see,
+// they do not move further than they really would.
+settings.dotsPerEdge = 7
+settings.dotDiameter = 15
+settings.opacity = 0.95
+settings.edgeInset = 40
 settings.gain = CueIntensity.high.gain     // disclosed in the alt text
 settings.placement = .sides
 settings.appearance = .dark                // light dots, this backdrop is dark
@@ -139,7 +143,13 @@ for frameIndex in 0..<(warmupFrames + totalFrames) {
     ctx.draw(backdropCG, in: CGRect(origin: .zero, size: pixelSize))
     ctx.saveGState()
     ctx.scaleBy(x: scale, y: scale)
+    // Rest-position marks first, so the dots sit on top of their own reference.
+    Annotations.drawRestMarks(DotLayout.positions(in: pointSize, settings: settings),
+                              diameter: CGFloat(settings.dotDiameter), in: ctx)
     root.render(in: ctx)
+    Annotations.drawPanel(motion: motion, in: ctx, canvas: pointSize)
+    Annotations.drawCaption("Dots move opposite to the car, like a loose object on the dashboard",
+                            in: ctx, canvas: pointSize)
     ctx.restoreGState()
 
     guard let image = ctx.makeImage() else { continue }
