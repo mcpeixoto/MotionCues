@@ -72,6 +72,28 @@ targets:
         # Resolve @testable symbols against the host app binary.
         BUNDLE_LOADER: "$(TEST_HOST)"
 
+  # Offline generator for the README / social demo asset. Compiles the real
+  # engine and renderer sources directly, so the dots it draws are the shipping
+  # code's output rather than a reimplementation. Not part of the app.
+  DemoRenderer:
+    type: tool
+    platform: macOS
+    sources:
+      - path: Tools/DemoRenderer
+      - path: Shared
+      - path: MotionCues/Motion
+        excludes:
+          - "HeadphoneMotionProvider.swift"
+      - path: MotionCues/Rendering
+      - path: MotionCues/Settings/RenderSettings.swift
+    settings:
+      base:
+        PRODUCT_NAME: DemoRenderer
+        PRODUCT_BUNDLE_IDENTIFIER: com.motioncues.DemoRenderer
+        SWIFT_MODULE_NAME: DemoRenderer
+        CODE_SIGN_ENTITLEMENTS: ""
+        ENABLE_HARDENED_RUNTIME: NO
+
   MotionCuesIOS:
     type: application
     platform: iOS
@@ -107,6 +129,13 @@ schemes:
       targets:
         - MotionCuesTests
     archive:
+      config: Release
+
+  DemoRenderer:
+    build:
+      targets:
+        DemoRenderer: all
+    run:
       config: Release
 
   MotionCuesIOS:

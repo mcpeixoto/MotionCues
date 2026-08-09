@@ -11,7 +11,15 @@ ear feels.
 Menu-bar app, no Dock icon, click-through overlay, no network access beyond a
 direct link to your own iPhone.
 
-<!-- DEMO -->
+![MotionCues demo](docs/demo.gif)
+
+> The clip above is **not a screen recording** — Screen Recording permission was
+> not available on the machine this was built on. Every dot position in it is
+> nonetheless the genuine output of the shipping `MotionEngine` and
+> `LayerDotRenderer`, rendered offline frame by frame; only the desktop behind
+> the dots is a mockup. Intensity is set to High so the movement survives video
+> compression. See [Tools/README.md](Tools/README.md) for exactly how it is
+> generated, and regenerate it yourself in three commands.
 
 > **Status:** works, and every claim in this README was measured rather than
 > assumed. It is a personal project: there are no signed or notarised builds,

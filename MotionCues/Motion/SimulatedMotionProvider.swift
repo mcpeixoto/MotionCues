@@ -112,6 +112,16 @@ final class SimulatedMotionProvider: MotionProvider {
         return sin(.pi * c)
     }
 
+    /// Advance the synthetic drive by exactly one sample, synchronously.
+    ///
+    /// The normal path is a `DispatchSourceTimer`, which is right for the app
+    /// and wrong for anything that needs frame-exact, reproducible output. The
+    /// offline demo renderer in `Tools/DemoRenderer` drives the simulator
+    /// through this instead, so the generated asset is identical on every run.
+    func step() {
+        tick()
+    }
+
     private func tick() {
         t += interval
         let d = drive(at: t)

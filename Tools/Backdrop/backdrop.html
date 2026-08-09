@@ -1,0 +1,189 @@
+<!doctype html>
+<!--
+  Backdrop for the demo asset.
+
+  This is a MOCKUP of a Mac screen, drawn in HTML and rendered once to a PNG.
+  It exists because the demo could not be captured as a real screen recording.
+  The dots composited on top of it are NOT drawn here — they come from the real
+  MotionEngine and LayerDotRenderer at runtime. See Tools/DemoRenderer.
+-->
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<style>
+  :root {
+    --bg: #1c1d21;
+    --panel: #232428;
+    --panel-2: #26272c;
+    --line: #34353b;
+    --text: #c9ccd4;
+    --dim: #7b7f8a;
+    --accent: #6ea8fe;
+    --green: #7ec699;
+    --purple: #c792ea;
+    --orange: #e2a76f;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  html, body { width: 1470px; height: 956px; overflow: hidden; }
+  body {
+    background: var(--bg);
+    font: 13px/1.65 ui-monospace, "SF Mono", Menlo, monospace;
+    color: var(--text);
+    -webkit-font-smoothing: antialiased;
+  }
+
+  /* ---- menu bar ---- */
+  .menubar {
+    height: 38px; display: flex; align-items: center; gap: 22px;
+    padding: 0 18px; background: rgba(28,29,33,.92);
+    border-bottom: 1px solid #000; font: 500 13px -apple-system, system-ui;
+  }
+  .menubar .apple { font-size: 15px; opacity: .85; }
+  .menubar .app { font-weight: 700; }
+  .menubar .spacer { flex: 1; }
+  .menubar .right { display: flex; align-items: center; gap: 18px; color: var(--dim); }
+  .menubar .car {
+    color: var(--text); font-size: 15px;
+    padding: 1px 8px; border-radius: 6px; background: rgba(255,255,255,.13); font-size: 17px;
+  }
+
+  /* ---- window ---- */
+  .win {
+    position: absolute; left: 96px; top: 92px; width: 1278px; height: 792px;
+    background: var(--panel); border-radius: 12px; overflow: hidden;
+    box-shadow: 0 34px 90px rgba(0,0,0,.62), 0 0 0 1px rgba(255,255,255,.05);
+    display: flex; flex-direction: column;
+  }
+  .titlebar {
+    height: 40px; display: flex; align-items: center; gap: 9px; padding: 0 15px;
+    background: var(--panel-2); border-bottom: 1px solid var(--line);
+  }
+  .dot { width: 12px; height: 12px; border-radius: 50%; }
+  .r { background: #ff5f57; } .y { background: #febc2e; } .g { background: #28c840; }
+  .title {
+    flex: 1; text-align: center; color: var(--dim);
+    font: 500 12.5px -apple-system, system-ui; margin-right: 54px;
+  }
+
+  .body { flex: 1; display: flex; min-height: 0; }
+  .sidebar {
+    width: 232px; border-right: 1px solid var(--line); padding: 14px 0;
+    background: #202126; font: 12.5px -apple-system, system-ui;
+  }
+  .sidebar h4 {
+    color: var(--dim); font: 600 10.5px -apple-system; letter-spacing: .09em;
+    text-transform: uppercase; padding: 0 16px 8px;
+  }
+  .sidebar div.f { padding: 4px 16px 4px 30px; color: #9aa0ab; }
+  .sidebar div.f.on { background: rgba(110,168,254,.15); color: #dfe4ec; }
+
+  .code { flex: 1; padding: 20px 26px; overflow: hidden; }
+  .code .ln { display: flex; gap: 22px; white-space: pre; }
+  .code .n { color: #4c4e56; width: 26px; text-align: right; user-select: none; }
+  .k { color: var(--purple); } .s { color: var(--green); }
+  .c { color: #5f6570; font-style: italic; } .t { color: var(--accent); }
+  .num { color: var(--orange); }
+</style>
+</head>
+<body>
+
+<div class="menubar">
+  <span class="apple">&#63743;</span>
+  <span class="app">Xcode</span>
+  <span>File</span><span>Edit</span><span>View</span><span>Product</span><span>Debug</span>
+  <span class="spacer"></span>
+  <span class="right">
+    <span class="car">&#128663;</span>
+    <span>&#9679;&#9679;&#9679;</span>
+    <span>100%</span>
+    <span>Sat 14:32</span>
+  </span>
+</div>
+
+<div class="win">
+  <div class="titlebar">
+    <span class="dot r"></span><span class="dot y"></span><span class="dot g"></span>
+    <span class="title">MotionEngine.swift — MotionCues</span>
+  </div>
+  <div class="body">
+    <div class="sidebar">
+      <h4>MotionCues</h4>
+      <div class="f">App</div>
+      <div class="f">Motion</div>
+      <div class="f on">&#8226; MotionEngine.swift</div>
+      <div class="f">Filters.swift</div>
+      <div class="f">Calibration.swift</div>
+      <div class="f">ReferenceFrame.swift</div>
+      <div class="f">Networking</div>
+      <div class="f">Overlay</div>
+      <div class="f">Rendering</div>
+      <div class="f">Settings</div>
+      <div class="f">Shared</div>
+      <div class="f">Tests</div>
+    </div>
+    <div class="code" id="code"></div>
+  </div>
+</div>
+
+<script>
+// Real lines from the project, so the backdrop is at least honest about what
+// the code looks like.
+const lines = [
+  ['c','// Device frame \u2192 Z-up reference frame.'],
+  [],
+  ['k','let ','t','accelRef','',' = rotation * frame.userAcceleration'],
+  ['k','let ','t','omegaRef','',' = rotation * frame.rotationRate'],
+  [],
+  ['c','// Yaw rate about the true vertical. Positive = turning left.'],
+  ['k','let ','t','yawRateRaw','',' = omegaRef.z'],
+  [],
+  ['','yawEstimator.add(ax: accelRef.x, ay: accelRef.y, yawRate: yawRateRaw)'],
+  ['','updateCalibrationIfNeeded(dt: dt)'],
+  [],
+  ['c','// Reference frame \u2192 vehicle frame (+x forward, +y left).'],
+  ['k','let ','t','psi','',' = calibration.effectiveYaw'],
+  ['k','let ','t','c','',' = cos(psi), ','k','let ','t','s','',' = sin(psi)'],
+  ['k','let ','t','forwardRaw','',' =  accelRef.x * c + accelRef.y * s'],
+  ['k','let ','t','lateralRaw','',' = -accelRef.x * s + accelRef.y * c'],
+  [],
+  ['c','// Strip sustained offsets (road grade, residual tilt error).'],
+  ['k','let ','t','forwardDC','',' = forwardBias.remove(forwardRaw, dt: dt)'],
+  ['k','let ','t','lateralDC','',' = lateralBias.remove(lateralRaw, dt: dt)'],
+  [],
+  ['c','// Adaptive smoothing \u2014 One Euro, cutoff follows the signal.'],
+  ['k','let ','t','yawRate','',' = yawRateFilter.filter(yawRateRaw, dt: dt)'],
+  ['k','let ','t','forward','',' = forwardFilter.filter(forwardDC, dt: dt)'],
+  ['k','var ','t','lateral','',' = lateralFilter.filter(lateralDC, dt: dt)'],
+  [],
+  ['c','// Roll compensation via v\u00b7\u03c9, when speed is known.'],
+  ['','lateral = lateralFusion.fuse(measured: lateral,'],
+  ['','                            yawRate: yawRate,'],
+  ['','                            speed: frame.speed, dt: dt)'],
+  [],
+  ['','state.store(VehicleMotion(forward: forward,'],
+  ['','                          lateral: lateral,'],
+  ['','                          vertical: vertical,'],
+  ['','                          yawRate: yawRate,'],
+  ['','                          timestamp: hostUptime()))'],
+];
+const el = document.getElementById('code');
+lines.forEach((parts, i) => {
+  const row = document.createElement('div');
+  row.className = 'ln';
+  const n = document.createElement('span');
+  n.className = 'n';
+  n.textContent = String(i + 42);
+  row.appendChild(n);
+  const body = document.createElement('span');
+  for (let j = 0; j < parts.length; j += 2) {
+    const span = document.createElement('span');
+    if (parts[j]) span.className = parts[j];
+    span.textContent = parts[j + 1] ?? '';
+    body.appendChild(span);
+  }
+  row.appendChild(body);
+  el.appendChild(row);
+});
+</script>
+</body>
+</html>
