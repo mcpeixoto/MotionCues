@@ -51,6 +51,10 @@ public struct MotionFrame: Sendable, Equatable {
     public var gravity: SIMD3<Double>
     /// Ground speed in m/s if the sender has a usable GPS fix, else `nil`.
     public var speed: Double?
+    /// Whether the sender believes it is in a moving vehicle. `nil` when the
+    /// sender does not do that detection at all, which is different from
+    /// "definitely parked" and is treated differently by the receiver.
+    public var isDriving: Bool?
 
     public init(seq: UInt32,
                 senderTime: Double,
@@ -58,7 +62,8 @@ public struct MotionFrame: Sendable, Equatable {
                 userAcceleration: SIMD3<Double>,
                 rotationRate: SIMD3<Double>,
                 gravity: SIMD3<Double>,
-                speed: Double? = nil) {
+                speed: Double? = nil,
+                isDriving: Bool? = nil) {
         self.seq = seq
         self.senderTime = senderTime
         self.quaternion = quaternion
@@ -66,6 +71,7 @@ public struct MotionFrame: Sendable, Equatable {
         self.rotationRate = rotationRate
         self.gravity = gravity
         self.speed = speed
+        self.isDriving = isDriving
     }
 }
 
@@ -121,7 +127,8 @@ private struct ByteReader {
 ///     0  u32  magic
 ///     4  u16  version
 ///     6  u8   kind
-///     7  u8   flags   (bit0: speed valid)
+///     7  u8   flags   (bit0: speed valid, bit1: drive state known,
+///                       bit2: driving)
 ///     8  u32  seq
 ///    12  f64  senderTime
 ///    20  f32  quaternion x,y,z,w
@@ -132,13 +139,20 @@ private struct ByteReader {
 public enum MotionFrameCodec {
     public static let byteCount = 76
     private static let flagSpeedValid: UInt8 = 1 << 0
+    private static let flagDriveKnown: UInt8 = 1 << 1
+    private static let flagDriving: UInt8 = 1 << 2
 
     public static func encode(_ frame: MotionFrame) -> Data {
         var w = ByteWriter(count: byteCount)
         w.u32(MotionCuesService.magic)
         w.u16(MotionCuesService.protocolVersion)
         w.u8(PacketKind.motion.rawValue)
-        w.u8(frame.speed == nil ? 0 : flagSpeedValid)
+        var flags: UInt8 = frame.speed == nil ? 0 : flagSpeedValid
+        if let driving = frame.isDriving {
+            flags |= flagDriveKnown
+            if driving { flags |= flagDriving }
+        }
+        w.u8(flags)
         w.u32(frame.seq)
         w.f64(frame.senderTime)
         w.f32(frame.quaternion.x); w.f32(frame.quaternion.y)
@@ -165,9 +179,10 @@ public enum MotionFrameCodec {
         let g = SIMD3<Double>(r.f32(), r.f32(), r.f32())
         let rawSpeed = r.f32()
         let speed = (flags & flagSpeedValid) != 0 ? rawSpeed : nil
+        let isDriving = (flags & flagDriveKnown) != 0 ? (flags & flagDriving) != 0 : nil
         return MotionFrame(seq: seq, senderTime: time, quaternion: q,
                            userAcceleration: ua, rotationRate: rr,
-                           gravity: g, speed: speed)
+                           gravity: g, speed: speed, isDriving: isDriving)
     }
 
     /// Peek at the packet kind without a full decode.

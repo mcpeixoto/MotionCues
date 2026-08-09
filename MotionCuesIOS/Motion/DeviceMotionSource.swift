@@ -39,6 +39,13 @@ final class DeviceMotionSource: NSObject, CLLocationManagerDelegate {
     private let location = CLLocationManager()
     private var seq: UInt32 = 0
     private var currentSpeed: Double?
+    /// Set from the main actor; read on the Core Motion queue. A one-frame
+    /// stale read of a Bool is harmless and this avoids a lock on the hot path.
+    private var drivingFlag: Bool?
+
+    /// The phone's verdict on whether you are in a moving vehicle, forwarded
+    /// to the Mac in every frame. `nil` disables the feature end to end.
+    func setDriving(_ value: Bool?) { drivingFlag = value }
 
     /// Delivered on the motion queue at sensor rate.
     var onFrame: ((MotionFrame) -> Void)?
@@ -133,7 +140,8 @@ final class DeviceMotionSource: NSObject, CLLocationManagerDelegate {
                                         dm.rotationRate.y,
                                         dm.rotationRate.z),
             gravity: SIMD3<Double>(dm.gravity.x, dm.gravity.y, dm.gravity.z),
-            speed: currentSpeed
+            speed: currentSpeed,
+            isDriving: drivingFlag
         )
         onFrame?(frame)
     }

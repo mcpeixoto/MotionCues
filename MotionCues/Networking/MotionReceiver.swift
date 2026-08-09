@@ -236,6 +236,11 @@ final class MotionReceiver: MotionProvider {
         clockOffset = floor
         status.latencyMs = max(0, (observed - floor) * 1000)
 
+        if status.isDriving != frame.isDriving {
+            status.isDriving = frame.isDriving
+            onStatusChange?(status)
+        }
+
         onFrame?(frame)
 
         if meter.record(seq: frame.seq, now: now) {

@@ -31,6 +31,14 @@ struct MotionCuesApp: App {
         }
         .menuBarExtraStyle(.menu)
 
+        Window("Welcome to MotionCues", id: WelcomeWindowID.value) {
+            WelcomeView()
+                .environmentObject(coordinator)
+                .environmentObject(settings)
+        }
+        .windowResizability(.contentSize)
+        .defaultPosition(.center)
+
         Window("MotionCues Settings", id: SettingsWindowID.value) {
             SettingsView()
                 .environmentObject(coordinator)
@@ -49,6 +57,11 @@ enum SettingsWindowID {
     static let openRequest = Notification.Name("com.motioncues.openSettings")
 }
 
+enum WelcomeWindowID {
+    static let value = "motioncues-welcome"
+    static let openRequest = Notification.Name("com.motioncues.openWelcome")
+}
+
 /// The status item's icon. It is also the app's only permanently-alive view,
 /// which makes it the natural place to hold the `openWindow` action for
 /// requests that originate in AppKit — the menu's contents only exist while
@@ -65,6 +78,10 @@ private struct MenuBarLabel: View {
             openWindow(id: SettingsWindowID.value)
             NSApp.activate(ignoringOtherApps: true)
         }
+        .onReceive(NotificationCenter.default.publisher(for: WelcomeWindowID.openRequest)) { _ in
+            openWindow(id: WelcomeWindowID.value)
+            NSApp.activate(ignoringOtherApps: true)
+        }
     }
 }
 
@@ -73,6 +90,14 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         // Belt and braces alongside LSUIElement: never a Dock icon, never
         // steals activation from whatever you are actually using.
         NSApp.setActivationPolicy(.accessory)
+
+        // A menu-bar app with no Dock icon shows nothing at all on first
+        // launch. Say hello once.
+        if !UserDefaults.standard.bool(forKey: "hasSeenWelcome") {
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.4) {
+                NotificationCenter.default.post(name: WelcomeWindowID.openRequest, object: nil)
+            }
+        }
 
         // Self-check hook used by the test scripts; no effect in normal use.
         if ProcessInfo.processInfo.environment["MC_PROBE"] != nil { runProbe() }

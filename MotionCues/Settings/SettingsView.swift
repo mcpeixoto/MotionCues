@@ -202,6 +202,8 @@ private struct SensorSettings: View {
                 }
                 Toggle("Start cues automatically when the app launches",
                        isOn: $settings.startOnLaunch)
+                Toggle("Only show cues while the car is moving",
+                       isOn: $settings.onlyWhileDriving)
                 LaunchAtLoginToggle()
             }
 
@@ -214,6 +216,7 @@ private struct SensorSettings: View {
                     LabeledContent("Transport jitter", value: String(format: "%.1f ms", jitter))
                 }
                 LabeledContent("Dropped packets", value: "\(coordinator.linkStatus.dropped)")
+                LabeledContent("In a vehicle", value: coordinator.isDriving.map { $0 ? "Yes" : "No" } ?? "Not reported")
                 if !coordinator.linkStatus.detail.isEmpty {
                     Text(coordinator.linkStatus.detail)
                         .font(.caption).foregroundStyle(.secondary)

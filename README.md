@@ -299,7 +299,9 @@ rebuilt on `didChangeScreenParameters`.
 
 Handled: multiple monitors, mixed Retina scale factors, resolution changes,
 displays plugged and unplugged, Spaces, wake from sleep, ProMotion (each
-overlay ticks on its own screen's `CADisplayLink`).
+overlay ticks on its own screen's `CADisplayLink`). Verified with two displays
+attached: one `OverlayWindow` per screen, each matching its own frame including
+a secondary display at a negative origin.
 
 Requires **no** permissions — no Accessibility, no Screen Recording.
 
@@ -387,10 +389,28 @@ phone, so the Simulator is only good for checking the UI.
 5. Adjust **Intensity** to taste. Start at Low.
 
 **Settings → Sensors** has *Open MotionCues at login* (via `SMAppService`,
-the supported sandbox-friendly API) and *Start cues automatically when the app
-launches*. Together those mean you get in the car, open the lid, and it is
-already running. Launching the app again while it is running opens Settings
-rather than appearing to do nothing.
+the supported sandbox-friendly API), *Start cues automatically when the app
+launches*, and *Only show cues while the car is moving*. Together those mean
+you get in the car, open the lid, and it is already running — and it puts
+itself away when you park.
+
+That last one is done on the phone, not the Mac. The obvious way to detect
+driving is Core Location, and the obvious device is the one showing the
+overlay — but a Mac has no GPS, so its position comes from Wi-Fi lookups with
+tens of metres of error, which cannot tell a car from a chair. The phone has
+`CMMotionActivityManager`, whose `automotive` classification answers exactly
+this question on a coprocessor for almost no battery. It is combined with GPS
+speed and a 90-second hysteresis, because a red light is not the end of a
+journey. The verdict rides along in the motion packets that are already
+flowing.
+
+It is off by default on the phone, and the Mac only ever acts on a definite
+"not driving": if nothing is reporting a drive state, the cues stay up.
+Silently hiding the overlay because we do not know would be much worse than
+showing it when it is not needed.
+
+On first launch a short welcome window explains the setup, because a menu-bar
+app with no Dock icon otherwise appears to do nothing at all.
 
 In a car with no Wi-Fi network: leave Wi-Fi switched **on** anyway on both
 devices. Peer-to-peer discovery uses the Wi-Fi radio and does not need a
@@ -403,6 +423,7 @@ On an M4 MacBook Air at 1470×956, Release build:
 | Condition | CPU |
 |---|---|
 | Simulator source, 100 Hz sensor, full particle field | ~3–6 % of one core |
+| The same across two displays (1920×1080 + 1470×956) | ~4–7 % |
 | Idle (no motion for 3 s — display links park themselves) | ~1–2 % |
 
 Getting there took measuring rather than guessing. A full-screen Metal overlay

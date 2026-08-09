@@ -16,6 +16,9 @@ final class AppCoordinator: ObservableObject {
     @Published private(set) var calibrationQuality = CalibrationQuality()
     @Published private(set) var isCalibrating = false
     @Published private(set) var activeSource: MotionSourceKind = .automatic
+    /// What the phone says about being in a vehicle. `nil` when nothing is
+    /// reporting it, which is treated as "show the cues" rather than "hide".
+    @Published private(set) var isDriving: Bool?
 
     let settings: AppSettings
     // `nonisolated`: the engine is deliberately driven from the sensor queue,
@@ -59,6 +62,11 @@ final class AppCoordinator: ObservableObject {
         settings.$hideFromScreenCapture
             .sink { [weak self] value in self?.overlay.setHiddenFromCapture(value) }
             .store(in: &cancellables)
+        settings.$onlyWhileDriving
+            .dropFirst()
+            .receive(on: RunLoop.main)
+            .sink { [weak self] _ in self?.applyDrivingGate() }
+            .store(in: &cancellables)
         settings.$sourceKind
             .dropFirst()
             // `@Published` fires from `willSet`, so at that instant
@@ -97,6 +105,7 @@ final class AppCoordinator: ObservableObject {
         guard !isRunning else { return }
         isRunning = true
         overlay.setHiddenFromCapture(settings.hideFromScreenCapture)
+        applyDrivingGate()
         overlay.show()
         startProviders()
         startStatusTimer()
@@ -113,6 +122,22 @@ final class AppCoordinator: ObservableObject {
     }
 
     func toggle() { isRunning ? stop() : start() }
+
+    /// Hide the overlay when the phone says the car is parked.
+    ///
+    /// Only ever acts on a definite `false`. If nothing is reporting a drive
+    /// state — no phone, or the phone has detection switched off — the cues
+    /// stay up. Silently hiding the overlay because we do not know is much
+    /// worse than showing it when it is not needed.
+    private func applyDrivingGate() {
+        guard isRunning else { return }
+        let shouldHide = settings.onlyWhileDriving && isDriving == false
+        if shouldHide {
+            overlay.hide()
+        } else {
+            overlay.show()
+        }
+    }
 
     // MARK: - Provider selection
 
@@ -201,6 +226,8 @@ final class AppCoordinator: ObservableObject {
                     if kind == .iPhone {
                         self.evaluateFallback(phoneConnected: status.connected)
                     }
+                    self.isDriving = status.isDriving
+                    self.applyDrivingGate()
                 }
             }
         }

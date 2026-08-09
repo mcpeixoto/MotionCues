@@ -54,9 +54,22 @@ struct ContentView: View {
                     }
                 }
 
-                Section("Options") {
+                Section {
                     Toggle("Keep screen awake while streaming", isOn: $bridge.keepAwake)
                     Toggle("Use GPS speed", isOn: $bridge.useLocation)
+                    Toggle("Detect when you're in a vehicle", isOn: $bridge.detectDriving)
+                    if bridge.detectDriving {
+                        LabeledContent("Right now", value: bridge.drive.state.rawValue)
+                        if let speed = bridge.drive.speed {
+                            LabeledContent("Speed", value: String(format: "%.0f km/h", speed * 3.6))
+                        }
+                    }
+                } header: {
+                    Text("Options")
+                } footer: {
+                    if bridge.detectDriving {
+                        Text("Your Mac hides the cues when this says you're not in a vehicle, so you don't have to remember to switch them off. It uses the motion coprocessor, which costs very little battery.")
+                    }
                 }
 
                 Section {

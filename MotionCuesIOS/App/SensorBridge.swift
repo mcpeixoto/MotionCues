@@ -27,11 +27,22 @@ final class SensorBridge: ObservableObject {
     }
 
     let sender = MotionSender()
+    let drive = DriveDetector()
     private let source = DeviceMotionSource()
     private var cancellables = Set<AnyCancellable>()
 
+    /// Off by default: it needs the Motion & Fitness permission and a little
+    /// battery, and the app is perfectly usable without it.
+    @Published var detectDriving = false {
+        didSet {
+            UserDefaults.standard.set(detectDriving, forKey: "detectDriving")
+            applyDriveDetection()
+        }
+    }
+
     init() {
         useLocation = UserDefaults.standard.bool(forKey: "useLocation")
+        detectDriving = UserDefaults.standard.bool(forKey: "detectDriving")
         keepAwake = UserDefaults.standard.object(forKey: "keepAwake") as? Bool ?? true
 
         source.onError = { [weak self] message in
@@ -46,6 +57,13 @@ final class SensorBridge: ObservableObject {
         sender.objectWillChange
             .sink { [weak self] in self?.objectWillChange.send() }
             .store(in: &cancellables)
+        drive.$state
+            .sink { [weak self] state in
+                guard let self, self.detectDriving else { return }
+                self.source.setDriving(state == .driving)
+                self.objectWillChange.send()
+            }
+            .store(in: &cancellables)
     }
 
     var motionAvailable: Bool { source.isAvailable }
@@ -58,6 +76,7 @@ final class SensorBridge: ObservableObject {
         source.useLocation = useLocation
         source.start()
         source.setBackgroundStreaming(useLocation)
+        applyDriveDetection()
         applyIdleTimer()
     }
 
@@ -66,6 +85,8 @@ final class SensorBridge: ObservableObject {
         isStreaming = false
         source.stop()
         sender.stop()
+        drive.stop()
+        source.setDriving(nil)
         applyIdleTimer()
     }
 
@@ -74,6 +95,19 @@ final class SensorBridge: ObservableObject {
     private func restart() {
         stop()
         start()
+    }
+
+    private func applyDriveDetection() {
+        guard isStreaming else { return }
+        if detectDriving {
+            drive.start()
+            source.setDriving(drive.isDriving)
+        } else {
+            drive.stop()
+            // nil means "not detecting", which the Mac treats differently
+            // from "definitely parked".
+            source.setDriving(nil)
+        }
     }
 
     private func applyIdleTimer() {

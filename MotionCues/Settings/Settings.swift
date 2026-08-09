@@ -26,6 +26,8 @@ final class AppSettings: ObservableObject {
     @Published var verticalCues: Bool { didSet { defaults.set(verticalCues, forKey: K.verticalCues) } }
     @Published var sourceKind: MotionSourceKind { didSet { defaults.set(sourceKind.rawValue, forKey: K.sourceKind) } }
     @Published var startOnLaunch: Bool { didSet { defaults.set(startOnLaunch, forKey: K.startOnLaunch) } }
+    @Published var onlyWhileDriving: Bool { didSet { defaults.set(onlyWhileDriving, forKey: K.onlyWhileDriving) } }
+    @Published var hasSeenWelcome: Bool { didSet { defaults.set(hasSeenWelcome, forKey: K.hasSeenWelcome) } }
     @Published var hideFromScreenCapture: Bool { didSet { defaults.set(hideFromScreenCapture, forKey: K.hideFromCapture) } }
     @Published var peripherySize: Double { didSet { defaults.set(peripherySize, forKey: K.peripherySize) } }
     @Published var responsiveness: Double { didSet { defaults.set(responsiveness, forKey: K.responsiveness) } }
@@ -54,6 +56,8 @@ final class AppSettings: ObservableObject {
             K.verticalCues: true,
             K.sourceKind: MotionSourceKind.automatic.rawValue,
             K.startOnLaunch: false,
+            K.onlyWhileDriving: true,
+            K.hasSeenWelcome: false,
             K.hideFromCapture: false,
             K.peripherySize: 240.0,
             K.responsiveness: 0.5,
@@ -69,6 +73,8 @@ final class AppSettings: ObservableObject {
         verticalCues = defaults.bool(forKey: K.verticalCues)
         sourceKind = MotionSourceKind(rawValue: defaults.string(forKey: K.sourceKind) ?? "") ?? .automatic
         startOnLaunch = defaults.bool(forKey: K.startOnLaunch)
+        onlyWhileDriving = defaults.bool(forKey: K.onlyWhileDriving)
+        hasSeenWelcome = defaults.bool(forKey: K.hasSeenWelcome)
         hideFromScreenCapture = defaults.bool(forKey: K.hideFromCapture)
         peripherySize = defaults.double(forKey: K.peripherySize)
         responsiveness = defaults.double(forKey: K.responsiveness)
@@ -127,6 +133,8 @@ final class AppSettings: ObservableObject {
         static let verticalCues = "verticalCues"
         static let sourceKind = "sourceKind"
         static let startOnLaunch = "startOnLaunch"
+        static let onlyWhileDriving = "onlyWhileDriving"
+        static let hasSeenWelcome = "hasSeenWelcome"
         static let hideFromCapture = "hideFromScreenCapture"
         static let peripherySize = "peripherySize"
         static let responsiveness = "responsiveness"

@@ -36,6 +36,41 @@ final class WireFormatTests: XCTestCase {
         XCTAssertEqual(try XCTUnwrap(decoded.speed), 23.5, accuracy: 1e-4)
     }
 
+    /// Three states, not two: detecting-and-driving, detecting-and-parked,
+    /// and not-detecting-at-all. The Mac treats the third very differently
+    /// from the second, so it must survive the wire.
+    func testDriveStateRoundTripsAsThreeStates() throws {
+        func roundTrip(_ value: Bool?) throws -> Bool?? {
+            var frame = MotionFrame(seq: 1, senderTime: 0,
+                                    quaternion: SIMD4<Double>(0, 0, 0, 1),
+                                    userAcceleration: .zero, rotationRate: .zero,
+                                    gravity: SIMD3<Double>(0, 0, -1))
+            frame.isDriving = value
+            return try XCTUnwrap(MotionFrameCodec.decode(MotionFrameCodec.encode(frame))).isDriving
+        }
+        XCTAssertEqual(try roundTrip(true), true)
+        XCTAssertEqual(try roundTrip(false), false)
+        XCTAssertNil(try roundTrip(nil) ?? nil)
+    }
+
+    /// The flags byte carries speed validity and drive state independently.
+    func testSpeedAndDriveFlagsDoNotInterfere() throws {
+        var frame = MotionFrame(seq: 1, senderTime: 0,
+                                quaternion: SIMD4<Double>(0, 0, 0, 1),
+                                userAcceleration: .zero, rotationRate: .zero,
+                                gravity: SIMD3<Double>(0, 0, -1),
+                                speed: nil, isDriving: true)
+        var decoded = try XCTUnwrap(MotionFrameCodec.decode(MotionFrameCodec.encode(frame)))
+        XCTAssertNil(decoded.speed)
+        XCTAssertEqual(decoded.isDriving, true)
+
+        frame.speed = 18
+        frame.isDriving = false
+        decoded = try XCTUnwrap(MotionFrameCodec.decode(MotionFrameCodec.encode(frame)))
+        XCTAssertEqual(try XCTUnwrap(decoded.speed), 18, accuracy: 1e-4)
+        XCTAssertEqual(decoded.isDriving, false)
+    }
+
     func testAbsentSpeedStaysAbsent() throws {
         var frame = MotionFrame(seq: 1, senderTime: 0,
                                 quaternion: SIMD4<Double>(0, 0, 0, 1),

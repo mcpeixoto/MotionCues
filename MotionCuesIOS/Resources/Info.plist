@@ -28,10 +28,6 @@
 		<string>UIInterfaceOrientationLandscapeRight</string>
 	</array>
 
-	<!-- Core Motion device motion. -->
-	<key>NSMotionUsageDescription</key>
-	<string>MotionCues reads accelerometer and gyroscope data to describe the car's movement to your Mac. It is sent only to your Mac, over your local network.</string>
-
 	<!-- Bonjour discovery + UDP to the Mac. Required from iOS 14 on. -->
 	<key>NSLocalNetworkUsageDescription</key>
 	<string>MotionCues finds your Mac on the local network and streams motion data straight to it. Nothing is sent to the Internet.</string>
@@ -39,6 +35,10 @@
 	<array>
 		<string>_mcues._udp</string>
 	</array>
+
+	<!-- Vehicle detection, so the Mac can hide the cues when you are parked. -->
+	<key>NSMotionUsageDescription</key>
+	<string>MotionCues reads accelerometer and gyroscope data to describe the car's movement to your Mac, and can use the motion coprocessor to tell when you are in a vehicle. It is sent only to your Mac, over your local network.</string>
 
 	<!-- Optional: GPS speed, used to compensate for body roll in corners. -->
 	<key>NSLocationWhenInUseUsageDescription</key>

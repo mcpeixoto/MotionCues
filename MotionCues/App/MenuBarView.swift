@@ -40,6 +40,11 @@ struct MenuBarView: View {
 
         Divider()
 
+        Button("Welcome & Setup…") {
+            openWindow(id: WelcomeWindowID.value)
+            NSApp.activate(ignoringOtherApps: true)
+        }
+
         Button("Settings…") {
             openWindow(id: SettingsWindowID.value)
             NSApp.activate(ignoringOtherApps: true)

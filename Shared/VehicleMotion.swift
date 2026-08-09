@@ -63,6 +63,9 @@ public struct MotionLinkStatus: Sendable, Equatable {
     public var dropped: Int = 0
     /// Human-readable detail, e.g. peer name or error.
     public var detail: String = ""
+    /// What the sender thinks about whether you are in a moving vehicle.
+    /// `nil` when the sender does not detect that.
+    public var isDriving: Bool?
 
     public init() {}
 }
