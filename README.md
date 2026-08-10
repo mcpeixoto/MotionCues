@@ -420,19 +420,32 @@ network to join. Personal Hotspot with the Mac joined also works.
 
 On an M4 MacBook Air at 1470×956, Release build:
 
-| Condition | CPU |
+Measured on an M4 MacBook Air with **two displays attached** (1920×1080 and
+1470×956), sampling every two seconds across a full 60-second simulated drive,
+Release build, signed:
+
+| | CPU |
 |---|---|
-| Simulator source, 100 Hz sensor, full particle field | ~3–6 % of one core |
-| The same across two displays (1920×1080 + 1470×956) | ~4–7 % |
-| Idle (no motion for 3 s — display links park themselves) | ~1–2 % |
+| median | 10 % of one core |
+| 90th percentile | 13 % |
+| worst | 18 % |
+| best (cruising) | 5 % |
+| idle — no motion for 3 s, display links parked | 1–2 % |
 
-Getting there took measuring rather than guessing. A full-screen Metal overlay
-at native Retina resolution cost 9–18 %. Dropping the render resolution to
-1.25× brought it to 5–10 %; dropping it further to 1.0× did *not* help, which
-showed the cost was per-frame compositing rather than pixels. Varying the
-frame rate with how much is actually happening — 24 fps cruising, 60 under a
-hard brake — is what brought it down to 3–6 %.
+The spread is the adaptive frame rate doing its job: 24 fps while cruising, up
+to 60 under a hard brake. It also means short samples lie. An earlier revision
+of this README claimed 3–6 %, which came from a twelve-second window that
+happened to land in a quiet stretch of the drive; the numbers above are a full
+cycle.
 
+Getting even that far took measuring rather than guessing. A full-screen Metal
+overlay at native Retina cost 9–18 % on a *single* display. Dropping the render
+resolution to 1.25× helped; dropping it further to 1.0× did *not*, which showed
+the cost was per-frame compositing rather than pixels. Varying the frame rate
+with how much is actually happening is what produced the numbers above.
+
+There is more to claw back — the two overlays each step their own copy of the
+particle field rather than sharing one — but this is honest as it stands.
 
 Memory ~76 MB resident. Network traffic 7.6 kB/s while streaming.
 
