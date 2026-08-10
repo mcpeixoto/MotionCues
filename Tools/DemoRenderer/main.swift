@@ -141,7 +141,7 @@ for frameIndex in 0..<(warmupFrames + totalFrames) {
     ctx.saveGState()
     ctx.scaleBy(x: scale, y: scale)
     Annotations.drawPanel(motion: motion, in: ctx, canvas: pointSize)
-    Annotations.drawCaption("Dots move opposite to the car, like a loose object on the dashboard",
+    Annotations.drawCaption("Accelerating expands the field · braking pulls it in · corners slide it",
                             in: ctx, canvas: pointSize)
     ctx.restoreGState()
 
