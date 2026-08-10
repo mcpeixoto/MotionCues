@@ -123,9 +123,19 @@ xcodebuild -project MotionCues.xcodeproj -scheme MotionCues \
 
 step "Verifying the signature"
 codesign --verify --deep --strict --verbose=2 "$APP"
-# Hardened runtime is a notarisation requirement, and easy to lose silently.
-codesign -d --verbose=4 "$APP" 2>&1 | grep -q "flags=.*runtime" \
-  || { echo "error: hardened runtime is not enabled" >&2; exit 1; }
+
+# Hardened runtime is a notarisation requirement and easy to lose silently.
+#
+# Read the output into a variable first. Piping into `grep -q` looks tidier but
+# is wrong under `set -o pipefail`: grep exits the moment it matches, codesign
+# takes SIGPIPE, and the pipeline reports failure for a correctly signed app —
+# which is exactly what happened the first time this script was run for real.
+SIGNING_INFO="$(codesign -d --verbose=4 "$APP" 2>&1 || true)"
+case "$SIGNING_INFO" in
+  *"(runtime)"*) ;;
+  *) echo "error: hardened runtime is not enabled — notarisation would reject this" >&2
+     exit 1 ;;
+esac
 
 # ---------------------------------------------------------------- notarise
 
