@@ -78,6 +78,20 @@ struct ParticleField {
 
     var cellY: Double { cellX * 2 * 3.0.squareRoot() / 3.0 }
 
+    // The lattice is periodic, and the field's offset is wrapped into one
+    // period so the numbers stay small. Getting the period wrong does not look
+    // like drift — it looks like a glitch.
+    //
+    // Alternate *rows* are staggered by half a cell in x, and alternate
+    // *planes* by a quarter. So the pattern only repeats after TWO cells in y
+    // and two in z, not one. Wrapping by a single cell (which is what this did
+    // originally) flips the stagger every time it wraps, and the entire field
+    // jumps sideways by half a cell — about 54 points, instantaneously, every
+    // 250 points of vertical travel. That is the "buggy" jitter.
+    var periodX: Double { cellX }
+    var periodY: Double { cellY * 2 }
+    var periodZ: Double { cellZ * 2 }
+
     // MARK: State
 
     /// Where the field currently is, in points. Wrapped into one cell.
@@ -136,14 +150,14 @@ struct ParticleField {
 
         // Wrap into a single cell in each axis. Everything downstream is
         // periodic, so this keeps the numbers small and the field seamless.
-        offset.x = Self.wrap(offset.x, cellX)
-        offset.y = Self.wrap(offset.y, cellY)
-        offset.z = Self.wrap(offset.z, cellZ)
+        offset.x = Self.wrap(offset.x, periodX)
+        offset.y = Self.wrap(offset.y, periodY)
+        offset.z = Self.wrap(offset.z, periodZ)
 
         // Keep the trail short and continuous across a wrap.
-        previousOffset.x = offset.x - Self.shortest(offset.x - previousOffset.x, cellX)
-        previousOffset.y = offset.y - Self.shortest(offset.y - previousOffset.y, cellY)
-        previousOffset.z = offset.z - Self.shortest(offset.z - previousOffset.z, cellZ)
+        previousOffset.x = offset.x - Self.shortest(offset.x - previousOffset.x, periodX)
+        previousOffset.y = offset.y - Self.shortest(offset.y - previousOffset.y, periodY)
+        previousOffset.z = offset.z - Self.shortest(offset.z - previousOffset.z, periodZ)
 
         // Intensity follows speed, not acceleration: it should stay up through
         // a long steady corner, and fall away when the car actually settles.
@@ -175,15 +189,21 @@ struct ParticleField {
 
         // How far the grid must extend past the glass to still cover the
         // screen once the nearest plane is magnified by perspective.
+        //
+        // The +2 / +4 slack is not cosmetic: `offset` is wrapped into a whole
+        // period, which is two cells in y and z, so the indices have to reach
+        // two cells further than the viewport alone would suggest or particles
+        // vanish at one edge of the screen while the offset is in the upper
+        // half of its period.
         let nearScale = eye / max(eye - depth, 1)
         let marginX = Int((w * nearScale / cellX).rounded(.up)) / 2 + 2
-        let marginY = Int((h * nearScale / cellY).rounded(.up)) / 2 + 2
+        let marginY = Int((h * nearScale / cellY).rounded(.up)) / 2 + 4
         let planes = Int((depth / cellZ).rounded(.up)) + 1
 
         let baseRadius = settings.dotDiameter / 2
         let periphery = settings.peripherySize * (0.35 + 0.65 * intensity)
 
-        for iz in 0...planes {
+        for iz in -1...(planes + 2) {
             // Depth of this plane, in front of the far wall.
             let z = Double(iz) * cellZ - offset.z
             guard z > -cellZ, z < depth + cellZ else { continue }
@@ -210,12 +230,21 @@ struct ParticleField {
                     // Peripheral falloff: the middle of the screen is where
                     // you are trying to read, so the cue lives at the edges.
                     let edge = Self.edgeDistance(x: px, y: py, width: w, height: h)
-                    // Squared so the cue hugs the edge instead of smearing a
-                    // wide gradient across half the screen.
+                    // Cubed, and cut off well above zero.
+                    //
+                    // A square law still leaves ~7 % alpha halfway to the
+                    // middle of the screen, and a 2 % cut-off keeps it. Several
+                    // hundred faint dots scattered over the text is what made
+                    // this read as a rendering fault rather than as a cue —
+                    // and it defeats the entire point of a *peripheral* cue,
+                    // which is that the middle stays clear enough to read.
+                    //
+                    // Cubed with a 0.05 floor confines the field to the outer
+                    // ~55 % of `peripherySize`: a band, with a clean inner edge.
                     let linear = 1 - Self.smoothstep(0, periphery, edge)
-                    let peripheral = linear * linear
+                    let peripheral = linear * linear * linear
                     let alpha = peripheral * depthFade * intensity
-                    guard alpha > 0.02 else { continue }
+                    guard alpha > 0.05 else { continue }
 
                     let prevX = cx + (wx - (offset.x - previousOffset.x)) * previousScale
                     let prevY = cy + (wy - (offset.y - previousOffset.y)) * previousScale

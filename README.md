@@ -16,7 +16,7 @@ direct link to your own iPhone.
 > The clip above is **not a screen recording** — Screen Recording permission was
 > not available on the machine this was built on. Every dot position in it is
 > nonetheless the genuine output of the shipping `MotionEngine` and
-> `LayerDotRenderer`, rendered offline frame by frame; only the desktop behind
+> `MetalDotRenderer`, rendered offline frame by frame; only the desktop behind
 > the dots is a mockup. Intensity is set to High so the movement survives video
 > compression. The state panel is driven by the same `VehicleMotion` the
 > particles are, so it cannot disagree with them. See
@@ -121,7 +121,7 @@ A two-tier architecture, both tiers real:
 └──────────────────────────────┘  ack   │ MotionStateBox  (lock, latest wins)  │
                                         │        ↓  read at vsync              │
                                         │ OverlayView ×N screens (CADisplayLink)│
-                                        │   LayerDotRenderer (CALayer per dot) │
+                                        │   MetalDotRenderer (1 instanced draw)│
                                         └───────────────────────────────────────┘
 ```
 
@@ -257,15 +257,30 @@ second version had to bound sideways travel because dots ran off the screen
 during a sustained corner, and that asymmetry was a symptom of the model being
 wrong rather than of the screen being small. It is simply gone now.
 
+The wrap has one trap in it, and the first release fell into it. Alternate rows
+are staggered by half a cell and alternate depth planes by a quarter, so the
+lattice repeats after *two* cells in y and z, not one — but the offset was
+wrapped after one. Every wrap flipped the stagger and teleported the whole
+field sideways by tens of points, several times a minute.
+`testTheFieldDoesNotJumpWhenItWraps` measures the median nearest-neighbour
+distance between consecutive frames: about a point when the motion is
+continuous, and 21.5 with the wrong period.
+
 Two other details:
 
-* **Every particle is drawn twice**, once light and once dark, slightly offset.
-  The overlay is not allowed to see what is behind it without Screen Recording
-  permission, so rather than guess the background, one of each pair is
-  guaranteed to contrast with it.
+* **Every particle is drawn twice**: a counter-coloured halo, then the dot
+  concentrically on top. The overlay is not allowed to see what is behind it
+  without Screen Recording permission, so rather than guess the background we
+  make sure one of the pair contrasts with it whatever it is. (An earlier
+  version offset the second copy sideways instead. It worked, but at the sizes
+  actually used it read as *two dots* rather than as one with a shadow, which
+  made the whole field look like a fault.)
 * **The cue stays in your peripheral vision.** Particle opacity falls off with
-  distance from the screen edge, so the middle — where you are actually
-  reading — stays clear.
+  the cube of the distance in from the screen edge and is cut off well above
+  zero, which confines the field to a band roughly 0.6 × *How far in from the
+  edge* wide. A square law with a near-zero cut-off, which is what the first
+  version used, leaves a haze of faint dots over the middle of the screen —
+  legible enough to be distracting and to defeat the point of a peripheral cue.
 
 The idea of a wrapping 3-D particle grid with perspective, motion trails and
 paired light/dark dots came from reading
@@ -451,7 +466,7 @@ Memory ~76 MB resident. Network traffic 7.6 kB/s while streaming.
 
 ## Tests
 
-`xcodebuild ... test` runs 43 tests covering the parts that fail silently if
+`xcodebuild ... test` runs 47 tests covering the parts that fail silently if
 they are wrong:
 
 * wire format round-trips, and rejection of foreign, truncated and
@@ -467,8 +482,9 @@ they are wrong:
   orientation and an unknown car heading, checked by correlation and by
   axis cross-talk;
 * the particle field: silence at rest, radial expansion under acceleration and
-  contraction under braking, lateral slide in corners, a seamless wrap, bounded
-  particle counts on a 6K display, and that the cue stays in the periphery;
+  contraction under braking, lateral slide in corners, bounded particle counts
+  on a 6K display, that the middle of the screen is left completely empty, and
+  that the field never jumps when its offset wraps;
 * that the Metal shader actually compiles — it is built from source at launch,
   so a syntax error would otherwise surface only as a silently missing overlay;
 * the real `MotionReceiver` over a real UDP socket on loopback: delivery,

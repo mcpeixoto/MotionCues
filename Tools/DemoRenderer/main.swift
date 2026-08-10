@@ -14,8 +14,9 @@
 //      band-limited road vibration.
 //    * `MotionEngine` resolves the reference frame, estimates the vehicle's
 //      forward axis, removes bias, and runs the One Euro filters — untouched.
-//    * `LayerDotRenderer` positions the dots — the same class the overlay uses,
-//      including the per-dot gain variation and the critically damped springs.
+//    * `ParticleField` + `MetalDotRenderer` place and draw the particles — the
+//      same types the overlay uses, through the same Metal pipeline and the
+//      same shader, pointed at an offscreen texture instead of a window.
 //
 //  So every dot position in the output is the genuine output of the shipping
 //  code. The only fabricated part is the desktop behind the dots, which is a
@@ -61,13 +62,13 @@ try? FileManager.default.createDirectory(at: outputDir, withIntermediateDirector
 // MARK: - The real pipeline
 
 var settings = RenderSettings()
-// Bigger and more opaque than the app's defaults, because a 9 pt dot at 45%
-// opacity disappears in a compressed, autoplaying timeline video. The *gain*
-// is untouched at the app's real High setting — the dots are easier to see,
-// they do not move further than they really would.
-settings.dotDiameter = 13
-settings.opacity = 0.9
-settings.peripherySize = 300
+// Slightly bigger and more opaque than the app's defaults (9 pt at 55 %),
+// because a small translucent dot disappears in a compressed, autoplaying
+// timeline video. The *gain* is untouched at the app's real High setting — the
+// dots are easier to see, they do not move further than they really would.
+settings.dotDiameter = 11
+settings.opacity = 0.85
+settings.peripherySize = 260
 settings.flowGain = CueIntensity.high.flowGain   // disclosed in the alt text
 settings.appearance = .dark                // light-first pairing; backdrop is dark
 settings.verticalCues = true

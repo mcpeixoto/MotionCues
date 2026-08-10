@@ -151,9 +151,16 @@ final class MetalDotRenderer: DotRendering {
         instances.removeAll(keepingCapacity: true)
         guard viewport.width > 1, viewport.height > 1 else { return }
 
-        // Paired dark and light copies, offset perpendicular to travel by a
-        // little over a radius, so whichever contrasts with the background
-        // reads and the other recedes.
+        // Each particle is drawn twice: a counter-coloured halo, then the dot
+        // itself concentrically on top.
+        //
+        // The first version offset the second copy by a little over a radius
+        // instead. That does solve contrast, but at the sizes actually used it
+        // does not read as one dot with a shadow — it reads as *two dots*, and
+        // a field of paired dots looks like a bug. Concentric is the standard
+        // answer (it is what a text shadow or a map label outline does): the
+        // halo is invisible against a background of its own colour and gives
+        // the dot a hard edge against the opposite one.
         let darkFirst = !isDark
         field.forEachParticle(viewport: viewport, settings: settings) { p in
             guard instances.count + 2 <= Self.maxInstances else { return }
@@ -162,18 +169,19 @@ final class MetalDotRenderer: DotRendering {
 
             let head = SIMD2<Float>(Float(p.position.x), Float(p.position.y))
             let tail = SIMD2<Float>(Float(p.previous.x), Float(p.previous.y))
-            let shift = SIMD2<Float>(0, r * 1.15)
 
             let strong: SIMD4<Float> = darkFirst
                 ? SIMD4<Float>(0, 0, 0, 1)
                 : SIMD4<Float>(1, 1, 1, 1)
+            // Weaker than the dot: the halo exists to give an edge, and at full
+            // strength it darkens whatever is behind the whole field.
             let counter: SIMD4<Float> = darkFirst
-                ? SIMD4<Float>(1, 1, 1, 0.85)
-                : SIMD4<Float>(0, 0, 0, 0.85)
+                ? SIMD4<Float>(1, 1, 1, 0.5)
+                : SIMD4<Float>(0, 0, 0, 0.5)
 
-            instances.append(InstanceData(head: head + shift, tail: tail + shift,
-                                          radius: r * 0.92, alpha: Float(p.alpha),
-                                          colour: counter))
+            instances.append(InstanceData(head: head, tail: tail,
+                                          radius: r + max(1.4, r * 0.55),
+                                          alpha: Float(p.alpha), colour: counter))
             instances.append(InstanceData(head: head, tail: tail,
                                           radius: r, alpha: Float(p.alpha),
                                           colour: strong))

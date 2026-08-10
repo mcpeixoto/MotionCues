@@ -570,18 +570,39 @@ final class ParticleFieldTests: XCTestCase {
                     seconds: 3)
         let w = Double(viewport.width), h = Double(viewport.height)
         var maxEdgeDistance = 0.0
-        var strongCount = 0
+        var count = 0
+        // Every particle, not just the strong ones. The first version of this
+        // test only looked at alpha > 0.25 and so happily passed while a haze
+        // of faint dots covered the entire screen — which is exactly what
+        // shipped, and exactly what looked broken.
         f.forEachParticle(viewport: viewport, settings: settings) { p in
-            guard p.alpha > 0.25 else { return }
-            strongCount += 1
+            count += 1
             maxEdgeDistance = max(maxEdgeDistance,
                                   ParticleField.edgeDistance(x: Double(p.position.x),
                                                              y: Double(p.position.y),
                                                              width: w, height: h))
         }
-        XCTAssertGreaterThan(strongCount, 0)
-        XCTAssertLessThan(maxEdgeDistance, settings.peripherySize,
-                          "a strongly visible particle was in the middle of the screen")
+        XCTAssertGreaterThan(count, 0)
+        // The cubic falloff and the 0.05 cut-off put the innermost particle at
+        // 0.59 · peripherySize; anything beyond that means the band has leaked.
+        XCTAssertLessThan(maxEdgeDistance, 0.62 * settings.peripherySize,
+                          "a particle was drawn \(maxEdgeDistance) pt in from the edge")
+    }
+
+    /// The middle must be readable, so measure it directly: a generous central
+    /// rectangle has to be completely empty.
+    func testTheMiddleOfTheScreenIsEmpty() {
+        let f = run(VehicleMotion(forward: 0.35, lateral: 0.25, vertical: 0, yawRate: 0.3, timestamp: 0),
+                    seconds: 5)
+        let inset = 0.7 * settings.peripherySize
+        let clear = CGRect(x: inset, y: inset,
+                           width: viewport.width - 2 * inset,
+                           height: viewport.height - 2 * inset)
+        var intruders = 0
+        f.forEachParticle(viewport: viewport, settings: settings) { p in
+            if clear.contains(p.position) { intruders += 1 }
+        }
+        XCTAssertEqual(intruders, 0, "\(intruders) particles were drawn over the middle of the screen")
     }
 
     // MARK: Maths
@@ -608,6 +629,67 @@ final class ParticleFieldTests: XCTestCase {
             }
         }
         XCTAssertLessThan(worst, 160, "a trail spanned \(worst) pt — the wrap leaked into it")
+    }
+
+    /// The field must not jump when the offset wraps.
+    ///
+    /// This is a regression test for a real, shipped glitch. Alternate rows are
+    /// staggered by half a cell and alternate planes by a quarter, so the
+    /// lattice only repeats after *two* cells — but the offset was wrapped
+    /// after one. Every wrap therefore flipped the stagger and teleported half
+    /// the field sideways by tens of points, several times a minute. It reads
+    /// as the whole overlay stuttering.
+    ///
+    /// Detected without needing particle identity: for each particle, the
+    /// distance to the nearest particle of the previous frame. Continuous
+    /// motion keeps that at roughly one frame of travel; a stagger flip puts
+    /// every affected particle midway between two old ones. The median is used
+    /// so that particles legitimately fading in or out cannot mask it.
+    func testTheFieldDoesNotJumpWhenItWraps() {
+        var f = ParticleField()
+        // Forward acceleration drives the z offset, which wraps every 400 pt —
+        // about every six seconds here, so ten seconds covers several wraps.
+        let motion = VehicleMotion(forward: 0.3, lateral: 0, vertical: 0, yawRate: 0, timestamp: 0)
+
+        // Restricted to a band down the left edge purely to keep this O(n²)
+        // comparison small; the stagger is global, so a jump shows up anywhere.
+        let band = CGRect(x: 0, y: 0, width: 220, height: viewport.height)
+        func sample() -> [CGPoint] {
+            var points: [CGPoint] = []
+            f.forEachParticle(viewport: viewport, settings: settings) { p in
+                if band.contains(p.position) { points.append(p.position) }
+            }
+            return points
+        }
+
+        for _ in 0..<120 { f.update(motion: motion, settings: settings, dt: 1.0 / 60.0) }
+        var previous = sample()
+        var worstMedian = 0.0
+
+        for _ in 0..<600 {
+            f.update(motion: motion, settings: settings, dt: 1.0 / 60.0)
+            let current = sample()
+            guard current.count > 8, previous.count > 8 else { previous = current; continue }
+
+            var nearest: [Double] = []
+            nearest.reserveCapacity(current.count)
+            for p in current {
+                var best = Double.greatestFiniteMagnitude
+                for q in previous {
+                    best = min(best, Double(hypot(p.x - q.x, p.y - q.y)))
+                }
+                nearest.append(best)
+            }
+            nearest.sort()
+            worstMedian = max(worstMedian, nearest[nearest.count / 2])
+            previous = current
+        }
+
+        // One frame of travel is a couple of points. Half a row's stagger is 54,
+        // a quarter of a plane's is 27; 12 leaves ample headroom for the former
+        // and none for the latter.
+        XCTAssertLessThan(worstMedian, 12,
+                          "the field teleported by \(worstMedian) pt between two frames")
     }
 }
 

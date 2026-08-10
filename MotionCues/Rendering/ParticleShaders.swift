@@ -16,11 +16,11 @@
 //  shader measures distance to a line segment, which degenerates to a circle
 //  when the segment has zero length.
 //
-//  Each particle is drawn twice, dark and light, slightly offset. That is the
-//  whole trick for staying visible over arbitrary content: we are not allowed
-//  to see what is behind the overlay without Screen Recording permission, so
-//  rather than guess the background we make sure one of the pair contrasts
-//  with it whatever it is.
+//  Each particle is drawn twice: a larger counter-coloured halo, then the dot
+//  concentrically on top. That is the whole trick for staying visible over
+//  arbitrary content: we are not allowed to see what is behind the overlay
+//  without Screen Recording permission, so rather than guess the background we
+//  make sure one of the pair contrasts with it whatever it is.
 //
 
 enum ParticleShaders {
