@@ -40,10 +40,16 @@ final class SensorBridge: ObservableObject {
         }
     }
 
+    @Published var language: AppLanguage = .english {
+        didSet { AppLanguage.persist(language) }
+    }
+
     init() {
         useLocation = UserDefaults.standard.bool(forKey: "useLocation")
         detectDriving = UserDefaults.standard.bool(forKey: "detectDriving")
         keepAwake = UserDefaults.standard.object(forKey: "keepAwake") as? Bool ?? true
+        language = AppLanguage(rawValue: UserDefaults.standard.string(forKey: AppLanguage.defaultsKey) ?? "")
+            ?? .english
 
         source.onError = { [weak self] message in
             Task { @MainActor in self?.errorMessage = message }

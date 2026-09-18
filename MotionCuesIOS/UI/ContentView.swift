@@ -8,6 +8,7 @@ struct ContentView: View {
     @EnvironmentObject private var bridge: SensorBridge
 
     var body: some View {
+        let lang = bridge.language
         NavigationStack {
             List {
                 Section {
@@ -15,7 +16,7 @@ struct ContentView: View {
                         Circle()
                             .fill(indicatorColor)
                             .frame(width: 12, height: 12)
-                        Text(bridge.sender.state.description)
+                        Text(bridge.sender.state.localizedDescription(lang))
                             .font(.headline)
                     }
                     if let error = bridge.errorMessage {
@@ -26,7 +27,9 @@ struct ContentView: View {
                 }
 
                 Section {
-                    Button(bridge.isStreaming ? "Stop streaming" : "Start streaming") {
+                    Button(bridge.isStreaming
+                           ? L10n.t(.stopStreaming, lang)
+                           : L10n.t(.startStreaming, lang)) {
                         bridge.toggle()
                     }
                     .disabled(!bridge.motionAvailable)
@@ -35,7 +38,7 @@ struct ContentView: View {
                 }
 
                 if !bridge.sender.discovered.isEmpty {
-                    Section("Macs found") {
+                    Section(L10n.t(.macsFound, lang)) {
                         ForEach(bridge.sender.discovered, id: \.self) { name in
                             HStack {
                                 Text(name)
@@ -55,42 +58,52 @@ struct ContentView: View {
                 }
 
                 Section {
-                    Toggle("Keep screen awake while streaming", isOn: $bridge.keepAwake)
-                    Toggle("Use GPS speed", isOn: $bridge.useLocation)
-                    Toggle("Detect when you're in a vehicle", isOn: $bridge.detectDriving)
+                    Picker(L10n.t(.language, lang), selection: $bridge.language) {
+                        ForEach(AppLanguage.allCases) { option in
+                            Text(option.menuTitle).tag(option)
+                        }
+                    }
+                    Toggle(L10n.t(.keepScreenAwake, lang), isOn: $bridge.keepAwake)
+                    Toggle(L10n.t(.useGPSSpeed, lang), isOn: $bridge.useLocation)
+                    Toggle(L10n.t(.detectVehicle, lang), isOn: $bridge.detectDriving)
                     if bridge.detectDriving {
-                        LabeledContent("Right now", value: bridge.drive.state.rawValue)
+                        LabeledContent(L10n.t(.rightNow, lang),
+                                       value: bridge.drive.state.localizedName(lang))
                         if let speed = bridge.drive.speed {
-                            LabeledContent("Speed", value: String(format: "%.0f km/h", speed * 3.6))
+                            LabeledContent(L10n.t(.speed, lang),
+                                           value: String(format: "%.0f km/h", speed * 3.6))
                         }
                     }
                 } header: {
-                    Text("Options")
+                    Text(L10n.t(.options, lang))
                 } footer: {
                     if bridge.detectDriving {
-                        Text("Your Mac hides the cues when this says you're not in a vehicle, so you don't have to remember to switch them off. It uses the motion coprocessor, which costs very little battery.")
+                        Text(L10n.t(.detectVehicleFooter, lang))
                     }
                 }
 
                 Section {
-                    LabeledContent("Packets sent", value: "\(bridge.sender.packetsSent)")
-                    LabeledContent("Dropped (backpressure)", value: "\(bridge.sender.dropped)")
-                    LabeledContent("Sample rate",
+                    LabeledContent(L10n.t(.packetsSent, lang),
+                                   value: "\(bridge.sender.packetsSent)")
+                    LabeledContent(L10n.t(.droppedBackpressure, lang),
+                                   value: "\(bridge.sender.dropped)")
+                    LabeledContent(L10n.t(.sampleRate, lang),
                                    value: "\(Int(MotionCuesService.sensorRateHz)) Hz")
                 } header: {
-                    Text("Link")
+                    Text(L10n.t(.link, lang))
                 } footer: {
-                    Text("GPS speed lets the Mac compensate for body roll in corners (lateral acceleration ≈ speed × yaw rate). It costs battery, so it is optional. Everything stays on your devices — the link is a direct UDP stream on the local network or over peer-to-peer Wi-Fi, with no Internet involved.")
+                    Text(L10n.t(.linkFooter, lang))
                 }
 
-                Section("If it will not connect") {
-                    Label("Both devices need Local Network permission. iOS asks the first time; if you said no, turn it back on in Settings › MotionCues.", systemImage: "1.circle")
-                    Label("Make sure MotionCues is running on the Mac and set to Automatic or iPhone.", systemImage: "2.circle")
-                    Label("No Wi-Fi in the car is fine — leave Wi-Fi switched ON anyway, because peer-to-peer discovery uses the Wi-Fi radio.", systemImage: "3.circle")
+                Section(L10n.t(.ifWillNotConnect, lang)) {
+                    Label(L10n.t(.tipLocalNetwork, lang), systemImage: "1.circle")
+                    Label(L10n.t(.tipMacRunning, lang), systemImage: "2.circle")
+                    Label(L10n.t(.tipWiFiOn, lang), systemImage: "3.circle")
                 }
                 .font(.callout)
             }
-            .navigationTitle("MotionCues")
+            .navigationTitle(L10n.t(.appName, lang))
+            .id(lang)
         }
     }
 

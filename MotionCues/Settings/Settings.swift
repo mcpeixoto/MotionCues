@@ -32,6 +32,9 @@ final class AppSettings: ObservableObject {
     @Published var peripherySize: Double { didSet { defaults.set(peripherySize, forKey: K.peripherySize) } }
     @Published var responsiveness: Double { didSet { defaults.set(responsiveness, forKey: K.responsiveness) } }
     @Published var idleFade: Bool { didSet { defaults.set(idleFade, forKey: K.idleFade) } }
+    @Published var language: AppLanguage {
+        didSet { AppLanguage.persist(language, defaults: defaults) }
+    }
 
     @Published var calibration: CalibrationState {
         didSet {
@@ -61,7 +64,8 @@ final class AppSettings: ObservableObject {
             K.hideFromCapture: false,
             K.peripherySize: 240.0,
             K.responsiveness: 0.5,
-            K.idleFade: true
+            K.idleFade: true,
+            K.language: AppLanguage.english.rawValue
         ])
 
         dotDiameter = defaults.double(forKey: K.dotDiameter)
@@ -79,6 +83,7 @@ final class AppSettings: ObservableObject {
         peripherySize = defaults.double(forKey: K.peripherySize)
         responsiveness = defaults.double(forKey: K.responsiveness)
         idleFade = defaults.bool(forKey: K.idleFade)
+        language = AppLanguage(rawValue: defaults.string(forKey: K.language) ?? "") ?? .english
 
         if let data = defaults.data(forKey: K.calibration),
            let decoded = try? JSONDecoder().decode(CalibrationState.self, from: data) {
@@ -139,6 +144,7 @@ final class AppSettings: ObservableObject {
         static let peripherySize = "peripherySize"
         static let responsiveness = "responsiveness"
         static let idleFade = "idleFade"
+        static let language = AppLanguage.defaultsKey
         static let calibration = "calibration"
     }
 }

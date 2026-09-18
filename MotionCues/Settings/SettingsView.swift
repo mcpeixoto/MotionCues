@@ -10,17 +10,19 @@ struct SettingsView: View {
     @EnvironmentObject private var settings: AppSettings
 
     var body: some View {
+        let lang = settings.language
         TabView {
             AppearanceSettings()
-                .tabItem { Label("Appearance", systemImage: "circle.grid.3x3") }
+                .tabItem { Label(L10n.t(.tabAppearance, lang), systemImage: "circle.grid.3x3") }
             MotionSettings()
-                .tabItem { Label("Motion", systemImage: "waveform.path.ecg") }
+                .tabItem { Label(L10n.t(.tabMotion, lang), systemImage: "waveform.path.ecg") }
             CalibrationView()
-                .tabItem { Label("Calibration", systemImage: "gyroscope") }
+                .tabItem { Label(L10n.t(.tabCalibration, lang), systemImage: "gyroscope") }
             SensorSettings()
-                .tabItem { Label("Sensors", systemImage: "antenna.radiowaves.left.and.right") }
+                .tabItem { Label(L10n.t(.tabSensors, lang), systemImage: "antenna.radiowaves.left.and.right") }
         }
         .padding(16)
+        .id(lang)
     }
 }
 
@@ -30,33 +32,44 @@ private struct AppearanceSettings: View {
     @EnvironmentObject private var settings: AppSettings
 
     var body: some View {
+        let lang = settings.language
         Form {
             Section {
-                slider("Dot size", value: $settings.dotDiameter, range: 3...22, unit: "pt")
-                slider("Opacity", value: $settings.opacity, range: 0.05...1.0, unit: "")
-                slider("How far in from the edge", value: $settings.peripherySize,
+                Picker(L10n.t(.language, lang), selection: $settings.language) {
+                    ForEach(AppLanguage.allCases) { option in
+                        Text(option.menuTitle).tag(option)
+                    }
+                }
+            }
+
+            Section {
+                slider(L10n.t(.dotSize, lang), value: $settings.dotDiameter, range: 3...22, unit: "pt")
+                slider(L10n.t(.opacity, lang), value: $settings.opacity, range: 0.05...1.0, unit: "")
+                slider(L10n.t(.howFarInFromEdge, lang), value: $settings.peripherySize,
                        range: 90...520, unit: "pt")
             } footer: {
-                Text("The cue lives in your peripheral vision. The middle of the screen is left clear, because that is where you are reading.")
+                Text(L10n.t(.peripheryFooter, lang))
                     .font(.caption).foregroundStyle(.secondary)
             }
 
             Section {
-                Picker("Contrast", selection: $settings.appearance) {
-                    ForEach(CueAppearance.allCases) { Text($0.displayName).tag($0) }
+                Picker(L10n.t(.contrast, lang), selection: $settings.appearance) {
+                    ForEach(CueAppearance.allCases) {
+                        Text($0.localizedName(lang)).tag($0)
+                    }
                 }
-                Toggle("Include vertical (bump) cues", isOn: $settings.verticalCues)
-                Toggle("Fade dots down when the car is still", isOn: $settings.idleFade)
-                Toggle("Hide overlay from screenshots and screen sharing",
+                Toggle(L10n.t(.includeVerticalCues, lang), isOn: $settings.verticalCues)
+                Toggle(L10n.t(.fadeDotsWhenStill, lang), isOn: $settings.idleFade)
+                Toggle(L10n.t(.hideFromScreenCapture, lang),
                        isOn: $settings.hideFromScreenCapture)
             } footer: {
-                Text("The overlay cannot read what is behind it without Screen Recording permission. Rather than guess, every particle is drawn twice — once light, once dark, slightly offset — so whichever one contrasts with your content is the one you see.")
+                Text(L10n.t(.contrastFooter, lang))
                     .font(.caption)
                     .foregroundStyle(.secondary)
             }
 
             Section {
-                Button("Reset to defaults") { settings.resetToDefaults() }
+                Button(L10n.t(.resetToDefaults, lang)) { settings.resetToDefaults() }
             }
         }
         .formStyle(.grouped)
@@ -85,35 +98,38 @@ private struct MotionSettings: View {
     @EnvironmentObject private var coordinator: AppCoordinator
 
     var body: some View {
+        let lang = settings.language
         Form {
             Section {
-                Picker("Intensity", selection: $settings.intensity) {
-                    ForEach(CueIntensity.allCases) { Text($0.displayName).tag($0) }
+                Picker(L10n.t(.intensity, lang), selection: $settings.intensity) {
+                    ForEach(CueIntensity.allCases) {
+                        Text($0.localizedName(lang)).tag($0)
+                    }
                 }
             } footer: {
-                Text("How hard the car's motion drives the field: \(Int(settings.intensity.flowGain)) pt/s² per g. Start at Low.")
+                Text(L10n.t(.intensityFooter, lang, Int(settings.intensity.flowGain)))
                     .font(.caption).foregroundStyle(.secondary)
             }
 
-            Section("Filtering") {
-                LabeledContent("Smoothing") {
+            Section(L10n.t(.filtering, lang)) {
+                LabeledContent(L10n.t(.smoothing, lang)) {
                     Slider(value: $settings.smoothing, in: 0...1)
                 }
-                LabeledContent("Sensitivity") {
+                LabeledContent(L10n.t(.sensitivity, lang)) {
                     Slider(value: $settings.sensitivity, in: 0...1)
                 }
-                LabeledContent("Responsiveness") {
+                LabeledContent(L10n.t(.responsiveness, lang)) {
                     Slider(value: $settings.responsiveness, in: 0...1)
                 }
             }
 
             Section {
-                Text("Smoothing sets how still the dots are at rest (the One Euro filter's cutoff floor). Sensitivity sets how far that cutoff opens under a fast manoeuvre, i.e. how little lag you get during hard braking. Responsiveness is the render-side spring: higher is snappier, lower is more fluid.")
+                Text(L10n.t(.filteringEssay, lang))
                     .font(.caption)
                     .foregroundStyle(.secondary)
             }
 
-            Section("Live reading") {
+            Section(L10n.t(.liveReading, lang)) {
                 MotionMeter()
             }
         }
@@ -124,14 +140,16 @@ private struct MotionSettings: View {
 /// A small live meter so you can sanity-check the pipeline without a car.
 private struct MotionMeter: View {
     @EnvironmentObject private var coordinator: AppCoordinator
+    @EnvironmentObject private var settings: AppSettings
     @State private var motion = VehicleMotion.zero
     private let tick = Timer.publish(every: 1.0 / 20.0, on: .main, in: .common).autoconnect()
 
     var body: some View {
+        let lang = settings.language
         VStack(alignment: .leading, spacing: 6) {
-            bar("Longitudinal", motion.forward, "brake ← → accelerate")
-            bar("Lateral", motion.lateral, "right ← → left")
-            bar("Vertical", motion.vertical, "down ← → up")
+            bar(L10n.t(.longitudinal, lang), motion.forward, L10n.t(.hintBrakeAccel, lang))
+            bar(L10n.t(.lateral, lang), motion.lateral, L10n.t(.hintRightLeft, lang))
+            bar(L10n.t(.vertical, lang), motion.vertical, L10n.t(.hintDownUp, lang))
         }
         .onReceive(tick) { _ in motion = coordinator.currentMotion }
     }
@@ -165,11 +183,13 @@ private struct MotionMeter: View {
 /// The system owns the login-item state, so this reads it live rather than
 /// mirroring it into UserDefaults where the two could drift apart.
 private struct LaunchAtLoginToggle: View {
+    @EnvironmentObject private var settings: AppSettings
     @State private var enabled = LoginItem.isEnabled
     @State private var problem: String?
 
     var body: some View {
-        Toggle("Open MotionCues at login", isOn: Binding(
+        let lang = settings.language
+        Toggle(L10n.t(.openAtLogin, lang), isOn: Binding(
             get: { enabled },
             set: { newValue in
                 problem = LoginItem.setEnabled(newValue)
@@ -177,7 +197,7 @@ private struct LaunchAtLoginToggle: View {
             }
         ))
         if LoginItem.isBlockedByUser {
-            Text("Turned off in System Settings › General › Login Items.")
+            Text(L10n.t(.loginItemBlocked, lang))
                 .font(.caption).foregroundStyle(.secondary)
         }
         if let problem {
@@ -193,30 +213,47 @@ private struct SensorSettings: View {
     @EnvironmentObject private var coordinator: AppCoordinator
 
     var body: some View {
+        let lang = settings.language
         Form {
-            Section("Source") {
-                Picker("Sensor", selection: $settings.sourceKind) {
-                    ForEach(MotionSourceKind.allCases, id: \.self) {
-                        Text($0.displayName).tag($0)
+            Section {
+                Picker(L10n.t(.language, lang), selection: $settings.language) {
+                    ForEach(AppLanguage.allCases) { option in
+                        Text(option.menuTitle).tag(option)
                     }
                 }
-                Toggle("Start cues automatically when the app launches",
+            }
+
+            Section(L10n.t(.source, lang)) {
+                Picker(L10n.t(.sensor, lang), selection: $settings.sourceKind) {
+                    ForEach(MotionSourceKind.allCases, id: \.self) {
+                        Text($0.localizedName(lang)).tag($0)
+                    }
+                }
+                Toggle(L10n.t(.startCuesOnLaunch, lang),
                        isOn: $settings.startOnLaunch)
-                Toggle("Only show cues while the car is moving",
+                Toggle(L10n.t(.onlyShowWhileMoving, lang),
                        isOn: $settings.onlyWhileDriving)
                 LaunchAtLoginToggle()
             }
 
-            Section("Link status") {
-                LabeledContent("Active source", value: coordinator.activeSource.displayName)
-                LabeledContent("Connected", value: coordinator.linkStatus.connected ? "Yes" : "No")
-                LabeledContent("Sample rate",
+            Section(L10n.t(.linkStatus, lang)) {
+                LabeledContent(L10n.t(.activeSource, lang),
+                               value: coordinator.activeSource.localizedName(lang))
+                LabeledContent(L10n.t(.connected, lang),
+                               value: coordinator.linkStatus.connected
+                               ? L10n.t(.yes, lang) : L10n.t(.no, lang))
+                LabeledContent(L10n.t(.sampleRate, lang),
                                value: String(format: "%.0f Hz", coordinator.linkStatus.rateHz))
                 if let jitter = coordinator.linkStatus.latencyMs {
-                    LabeledContent("Transport jitter", value: String(format: "%.1f ms", jitter))
+                    LabeledContent(L10n.t(.transportJitter, lang),
+                                   value: String(format: "%.1f ms", jitter))
                 }
-                LabeledContent("Dropped packets", value: "\(coordinator.linkStatus.dropped)")
-                LabeledContent("In a vehicle", value: coordinator.isDriving.map { $0 ? "Yes" : "No" } ?? "Not reported")
+                LabeledContent(L10n.t(.droppedPackets, lang),
+                               value: "\(coordinator.linkStatus.dropped)")
+                LabeledContent(L10n.t(.inAVehicle, lang),
+                               value: coordinator.isDriving.map {
+                                   $0 ? L10n.t(.yes, lang) : L10n.t(.no, lang)
+                               } ?? L10n.t(.notReported, lang))
                 if !coordinator.linkStatus.detail.isEmpty {
                     Text(coordinator.linkStatus.detail)
                         .font(.caption).foregroundStyle(.secondary)
@@ -224,21 +261,23 @@ private struct SensorSettings: View {
             }
 
             Section {
-                LabeledContent("Motion permission", value: coordinator.motionAuthorizationDescription)
-                LabeledContent("Headphone motion available",
-                               value: coordinator.headphonesAvailable ? "Yes" : "No")
+                LabeledContent(L10n.t(.motionPermission, lang),
+                               value: coordinator.motionAuthorizationDescription)
+                LabeledContent(L10n.t(.headphoneMotionAvailable, lang),
+                               value: coordinator.headphonesAvailable
+                               ? L10n.t(.yes, lang) : L10n.t(.no, lang))
             } header: {
-                Text("Mac sensors")
+                Text(L10n.t(.macSensors, lang))
             } footer: {
-                Text("This Mac has no built-in accelerometer or gyroscope — Core Motion's CMMotionManager is marked API_UNAVAILABLE(macos), and Apple Silicon Macs ship no inertial hardware. The only inertial source macOS exposes is head motion from AirPods (CMHeadphoneMotionManager, macOS 14+). It works, but head movement contaminates it, so the iPhone companion is the accurate path.")
+                Text(L10n.t(.macSensorsFooter, lang))
                     .font(.caption).foregroundStyle(.secondary)
             }
 
             Section {
-                Text("All sensor data stays on this Mac and on your phone. There is no account, no cloud, no analytics and no Internet access of any kind — the link is a direct UDP stream over your local network or over peer-to-peer Wi-Fi.")
+                Text(L10n.t(.privacyFooter, lang))
                     .font(.caption).foregroundStyle(.secondary)
             } header: {
-                Text("Privacy")
+                Text(L10n.t(.privacy, lang))
             }
         }
         .formStyle(.grouped)

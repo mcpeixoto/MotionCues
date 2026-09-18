@@ -81,7 +81,7 @@ final class HeadphoneMotionProvider: NSObject, MotionProvider, CMHeadphoneMotion
         switch CMHeadphoneMotionManager.authorizationStatus() {
         case .denied, .restricted:
             status.connected = false
-            status.detail = "Motion access denied — enable it in System Settings › Privacy & Security › Motion & Fitness."
+            status.detail = L10n.t(.motionAccessDeniedHeadphones, .current)
             onStatusChange?(status)
             return
         default:
@@ -90,7 +90,7 @@ final class HeadphoneMotionProvider: NSObject, MotionProvider, CMHeadphoneMotion
 
         guard manager.isDeviceMotionAvailable else {
             status.connected = false
-            status.detail = "No motion-capable headphones connected."
+            status.detail = L10n.t(.noMotionHeadphones, .current)
             onStatusChange?(status)
             return
         }
@@ -108,7 +108,7 @@ final class HeadphoneMotionProvider: NSObject, MotionProvider, CMHeadphoneMotion
             self.handle(motion)
         }
 
-        status.detail = "Waiting for headphones…"
+        status.detail = L10n.t(.waitingForHeadphones, .current)
         onStatusChange?(status)
     }
 
@@ -153,7 +153,7 @@ final class HeadphoneMotionProvider: NSObject, MotionProvider, CMHeadphoneMotion
 
         if !status.connected {
             status.connected = true
-            status.detail = "AirPods head motion (degraded source)"
+            status.detail = L10n.t(.airPodsDegraded, .current)
             onStatusChange?(status)
         }
         onFrame?(frame)
@@ -169,14 +169,14 @@ final class HeadphoneMotionProvider: NSObject, MotionProvider, CMHeadphoneMotion
 
     func headphoneMotionManagerDidConnect(_ manager: CMHeadphoneMotionManager) {
         status.connected = true
-        status.detail = "AirPods head motion (degraded source)"
+        status.detail = L10n.t(.airPodsDegraded, .current)
         onStatusChange?(status)
     }
 
     func headphoneMotionManagerDidDisconnect(_ manager: CMHeadphoneMotionManager) {
         status.connected = false
         status.rateHz = 0
-        status.detail = "Headphones disconnected."
+        status.detail = L10n.t(.headphonesDisconnected, .current)
         onStatusChange?(status)
     }
 }

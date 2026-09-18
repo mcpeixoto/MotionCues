@@ -10,24 +10,26 @@ struct CalibrationView: View {
     @State private var manualDegrees: Double = 0
 
     var body: some View {
+        let lang = settings.language
         Form {
             Section {
-                Text("MotionCues has to know which way the car points relative to the sensor. It works that out from the driving itself — you never have to align anything by hand.")
+                Text(L10n.t(.howItWorksBody, lang))
                     .font(.callout)
-                Text("Place the Mac where you normally use it, put the phone wherever it will stay (pocket, cradle, cup holder — orientation does not matter, only that it does not slide around), press Calibrate, then just travel normally for about twenty seconds. Include at least one bend.")
+                Text(L10n.t(.howItWorksDetail, lang))
                     .font(.caption)
                     .foregroundStyle(.secondary)
             } header: {
-                Text("How it works")
+                Text(L10n.t(.howItWorks, lang))
             }
 
-            Section("Status") {
-                LabeledContent("Calibrated",
-                               value: coordinator.currentCalibration.isCalibrated ? "Yes" : "Not yet")
-                LabeledContent("Forward axis",
+            Section(L10n.t(.status, lang)) {
+                LabeledContent(L10n.t(.calibrated, lang),
+                               value: coordinator.currentCalibration.isCalibrated
+                               ? L10n.t(.yes, lang) : L10n.t(.notYet, lang))
+                LabeledContent(L10n.t(.forwardAxis, lang),
                                value: String(format: "%.0f°",
                                              coordinator.currentCalibration.yaw * 180 / .pi))
-                LabeledContent("Confidence",
+                LabeledContent(L10n.t(.confidence, lang),
                                value: String(format: "%.0f%%",
                                              coordinator.calibrationQuality.confidence * 100))
 
@@ -35,12 +37,12 @@ struct CalibrationView: View {
                     VStack(alignment: .leading, spacing: 8) {
                         ProgressView(value: coordinator.calibrationQuality.confidence)
                         HStack {
-                            coverage("Accel / brake seen",
+                            coverage(L10n.t(.accelBrakeSeen, lang),
                                      coordinator.calibrationQuality.longitudinalCoverage)
-                            coverage("Cornering seen",
+                            coverage(L10n.t(.corneringSeen, lang),
                                      coordinator.calibrationQuality.lateralCoverage)
                         }
-                        Text("Keep driving. Braking and accelerating fix the axis; a bend resolves which way is forwards.")
+                        Text(L10n.t(.keepDrivingHint, lang))
                             .font(.caption).foregroundStyle(.secondary)
                     }
                 }
@@ -49,25 +51,25 @@ struct CalibrationView: View {
             Section {
                 HStack {
                     if coordinator.isCalibrating {
-                        Button("Cancel") { coordinator.cancelCalibration() }
+                        Button(L10n.t(.cancel, lang)) { coordinator.cancelCalibration() }
                     } else {
-                        Button("Calibrate") { coordinator.beginCalibration() }
+                        Button(L10n.t(.calibrate, lang)) { coordinator.beginCalibration() }
                             .disabled(!coordinator.isRunning)
                     }
                     Spacer()
-                    Button("Clear calibration", role: .destructive) {
+                    Button(L10n.t(.clearCalibration, lang), role: .destructive) {
                         coordinator.clearCalibration()
                         manualDegrees = 0
                     }
                 }
                 if !coordinator.isRunning {
-                    Text("Start MotionCues first — calibration needs live samples.")
+                    Text(L10n.t(.startFirstForCalibration, lang))
                         .font(.caption).foregroundStyle(.secondary)
                 }
             }
 
             Section {
-                Toggle("Keep refining in the background", isOn: Binding(
+                Toggle(L10n.t(.keepRefining, lang), isOn: Binding(
                     get: { settings.calibration.autoRefine },
                     set: { newValue in
                         var state = settings.calibration
@@ -76,7 +78,7 @@ struct CalibrationView: View {
                         coordinator.persistCalibration()
                     }
                 ))
-                LabeledContent("Manual adjustment") {
+                LabeledContent(L10n.t(.manualAdjustment, lang)) {
                     HStack {
                         Slider(value: $manualDegrees, in: -180...180, step: 1)
                             .onChange(of: manualDegrees) { _, new in
@@ -89,9 +91,9 @@ struct CalibrationView: View {
                     }
                 }
             } header: {
-                Text("Fine tuning")
+                Text(L10n.t(.fineTuning, lang))
             } footer: {
-                Text("Background refinement absorbs the gyroscope heading drift that Core Motion's magnetometer-free reference frame accumulates (a few degrees a minute), and copes with the phone being nudged. Turn it off if you would rather freeze the calibration exactly as measured.")
+                Text(L10n.t(.fineTuningFooter, lang))
                     .font(.caption).foregroundStyle(.secondary)
             }
         }

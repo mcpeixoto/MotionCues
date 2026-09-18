@@ -71,7 +71,7 @@ final class DeviceMotionSource: NSObject, CLLocationManagerDelegate {
     func start() {
         guard !isRunning else { return }
         guard motion.isDeviceMotionAvailable else {
-            onError?("Device motion is not available on this device.")
+            onError?(L10n.t(.deviceMotionUnavailable, .current))
             return
         }
         isRunning = true
@@ -105,7 +105,7 @@ final class DeviceMotionSource: NSObject, CLLocationManagerDelegate {
         case .notDetermined:
             location.requestWhenInUseAuthorization()
         case .denied, .restricted:
-            onError?("Location denied — lateral roll compensation will be skipped.")
+            onError?(L10n.t(.locationDeniedRoll, .current))
             return
         default:
             break

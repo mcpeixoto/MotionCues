@@ -326,12 +326,13 @@ final class AppCoordinator: ObservableObject {
     var headphonesAvailable: Bool { HeadphoneMotionProvider.isSupportedOnThisMac }
 
     var motionAuthorizationDescription: String {
+        let lang = AppLanguage.current
         switch CMHeadphoneMotionManager.authorizationStatus() {
-        case .authorized: "Granted"
-        case .denied: "Denied"
-        case .restricted: "Restricted"
-        case .notDetermined: "Not requested yet"
-        @unknown default: "Unknown"
+        case .authorized: return L10n.t(.authGranted, lang)
+        case .denied: return L10n.t(.authDenied, lang)
+        case .restricted: return L10n.t(.authRestricted, lang)
+        case .notDetermined: return L10n.t(.authNotRequested, lang)
+        @unknown default: return L10n.t(.authUnknown, lang)
         }
     }
 }

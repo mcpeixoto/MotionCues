@@ -28,16 +28,18 @@ struct WelcomeView: View {
             footer
         }
         .frame(width: 560, height: 620)
+        .id(settings.language)
     }
 
     private var header: some View {
-        VStack(spacing: 10) {
+        let lang = settings.language
+        return VStack(spacing: 10) {
             Image(systemName: "car.side.rear.and.collision.and.car.side.front")
                 .font(.system(size: 40, weight: .light))
                 .foregroundStyle(.tint)
-            Text("MotionCues")
+            Text(L10n.t(.appName, lang))
                 .font(.title.weight(.semibold))
-            Text("Small particles at the edges of the screen move with the car, so what your eyes see matches what your inner ear feels.")
+            Text(L10n.t(.welcomeBlurb, lang))
                 .font(.callout)
                 .foregroundStyle(.secondary)
                 .multilineTextAlignment(.center)
@@ -48,37 +50,34 @@ struct WelcomeView: View {
     }
 
     private var steps: some View {
-        VStack(alignment: .leading, spacing: 22) {
-            step(1, "Your Mac has no motion sensor",
-                 "Not a limitation of this app: macOS exposes no accelerometer, and Apple Silicon Macs have no inertial hardware at all. So an iPhone does the sensing and streams it over, a hundred times a second.") {
+        let lang = settings.language
+        return VStack(alignment: .leading, spacing: 22) {
+            step(1, L10n.t(.welcomeStep1Title, lang), L10n.t(.welcomeStep1Body, lang)) {
                 EmptyView()
             }
 
-            step(2, "Install the companion on your iPhone",
-                 "Build the MotionCuesIOS target onto your phone, open it and tap Start streaming. Your Mac will appear in its list within a second or two.") {
+            step(2, L10n.t(.welcomeStep2Title, lang), L10n.t(.welcomeStep2Body, lang)) {
                 if coordinator.linkStatus.connected {
-                    Label("iPhone connected", systemImage: "checkmark.circle.fill")
+                    Label(L10n.t(.iPhoneConnected, lang), systemImage: "checkmark.circle.fill")
                         .foregroundStyle(.green)
                 } else {
-                    Label("Waiting for a phone", systemImage: "clock")
+                    Label(L10n.t(.waitingForPhone, lang), systemImage: "clock")
                         .foregroundStyle(.secondary)
                 }
             }
 
-            step(3, "Allow the local network",
-                 "Both devices will ask once. The link is a direct connection between your own two devices — nothing goes to the Internet, here or ever.") {
+            step(3, L10n.t(.welcomeStep3Title, lang), L10n.t(.welcomeStep3Body, lang)) {
                 EmptyView()
             }
 
-            step(4, "Calibrate on your first journey",
-                 "Put the phone anywhere it will stay put; orientation does not matter. Press Calibrate and drive normally for about twenty seconds, including at least one bend. MotionCues works out which way the car points from the driving itself.") {
+            step(4, L10n.t(.welcomeStep4Title, lang), L10n.t(.welcomeStep4Body, lang)) {
                 EmptyView()
             }
 
             if coordinator.headphonesAvailable {
-                step(5, "AirPods will do at a pinch",
-                     "If the phone is not to hand, MotionCues can fall back to head motion from AirPods. It is a real inertial signal, but your head moves too, so treat it as the lesser option.") {
-                    Label("Motion permission: \(coordinator.motionAuthorizationDescription)",
+                step(5, L10n.t(.welcomeStep5Title, lang), L10n.t(.welcomeStep5Body, lang)) {
+                    Label(L10n.t(.motionPermissionLabel, lang,
+                                 coordinator.motionAuthorizationDescription),
                           systemImage: "info.circle")
                         .foregroundStyle(.secondary)
                 }
@@ -106,14 +105,15 @@ struct WelcomeView: View {
     }
 
     private var footer: some View {
-        HStack {
-            Button("Try it without a car") {
+        let lang = settings.language
+        return HStack {
+            Button(L10n.t(.tryWithoutCar, lang)) {
                 settings.sourceKind = .simulator
                 if !coordinator.isRunning { coordinator.start() }
             }
             Spacer()
-            Button("Settings…") { openWindow(id: SettingsWindowID.value) }
-            Button("Done") {
+            Button(L10n.t(.settingsEllipsis, lang)) { openWindow(id: SettingsWindowID.value) }
+            Button(L10n.t(.done, lang)) {
                 settings.hasSeenWelcome = true
                 dismiss()
             }

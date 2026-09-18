@@ -14,12 +14,14 @@ enum MotionSourceKind: String, CaseIterable, Codable, Sendable {
     case iPhone
     case simulator
 
-    var displayName: String {
+    var displayName: String { localizedName(.current) }
+
+    func localizedName(_ language: AppLanguage) -> String {
         switch self {
-        case .automatic: "Automatic"
-        case .mac: "Mac (AirPods)"
-        case .iPhone: "iPhone"
-        case .simulator: "Simulator"
+        case .automatic: L10n.t(.automatic, language)
+        case .mac: L10n.t(.macAirPods, language)
+        case .iPhone: L10n.t(.iPhone, language)
+        case .simulator: L10n.t(.simulator, language)
         }
     }
 }

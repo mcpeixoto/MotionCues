@@ -31,7 +31,7 @@ struct MotionCuesApp: App {
         }
         .menuBarExtraStyle(.menu)
 
-        Window("Welcome to MotionCues", id: WelcomeWindowID.value) {
+        Window(L10n.t(.welcomeWindowTitle, settings.language), id: WelcomeWindowID.value) {
             WelcomeView()
                 .environmentObject(coordinator)
                 .environmentObject(settings)
@@ -39,7 +39,7 @@ struct MotionCuesApp: App {
         .windowResizability(.contentSize)
         .defaultPosition(.center)
 
-        Window("MotionCues Settings", id: SettingsWindowID.value) {
+        Window(L10n.t(.settingsWindowTitle, settings.language), id: SettingsWindowID.value) {
             SettingsView()
                 .environmentObject(coordinator)
                 .environmentObject(settings)

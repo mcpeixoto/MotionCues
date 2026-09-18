@@ -45,7 +45,7 @@ enum LoginItem {
             log.error("login item \(enabled ? "register" : "unregister") failed: \(error.localizedDescription)")
             // The usual cause is running a build straight out of DerivedData:
             // launchd will not accept a login item from an unstable path.
-            return "Could not change this. macOS only accepts login items from a stable, signed location — move MotionCues to /Applications and try again. (\(error.localizedDescription))"
+            return L10n.t(.loginItemFailed, .current, error.localizedDescription)
         }
     }
 }

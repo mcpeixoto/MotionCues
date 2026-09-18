@@ -10,58 +10,66 @@ struct MenuBarView: View {
     @Environment(\.openWindow) private var openWindow
 
     var body: some View {
-        Text("Vehicle Motion Cues")
-        Text(statusLine)
+        let lang = settings.language
+        Text(L10n.t(.vehicleMotionCues, lang))
+        Text(statusLine(lang))
 
         Divider()
 
         if coordinator.isRunning {
-            Button("Stop") { coordinator.stop() }
+            Button(L10n.t(.menuStop, lang)) { coordinator.stop() }
                 .keyboardShortcut("s", modifiers: [.command, .shift])
         } else {
-            Button("Start") { coordinator.start() }
+            Button(L10n.t(.menuStart, lang)) { coordinator.start() }
                 .keyboardShortcut("s", modifiers: [.command, .shift])
         }
 
         Divider()
 
-        Picker("Intensity", selection: $settings.intensity) {
+        Picker(L10n.t(.intensity, lang), selection: $settings.intensity) {
             ForEach(CueIntensity.allCases) { level in
-                Text(level.displayName).tag(level)
+                Text(level.localizedName(lang)).tag(level)
             }
         }
 
-        Picker("Sensor", selection: $settings.sourceKind) {
-            Text("Automatic").tag(MotionSourceKind.automatic)
-            Text("Mac (AirPods)").tag(MotionSourceKind.mac)
-            Text("iPhone").tag(MotionSourceKind.iPhone)
-            Text("Simulator").tag(MotionSourceKind.simulator)
+        Picker(L10n.t(.sensor, lang), selection: $settings.sourceKind) {
+            Text(L10n.t(.automatic, lang)).tag(MotionSourceKind.automatic)
+            Text(L10n.t(.macAirPods, lang)).tag(MotionSourceKind.mac)
+            Text(L10n.t(.iPhone, lang)).tag(MotionSourceKind.iPhone)
+            Text(L10n.t(.simulator, lang)).tag(MotionSourceKind.simulator)
+        }
+
+        Picker(L10n.t(.language, lang), selection: $settings.language) {
+            ForEach(AppLanguage.allCases) { option in
+                Text(option.menuTitle).tag(option)
+            }
         }
 
         Divider()
 
-        Button("Welcome & Setup…") {
+        Button(L10n.t(.welcomeAndSetup, lang)) {
             openWindow(id: WelcomeWindowID.value)
             NSApp.activate(ignoringOtherApps: true)
         }
 
-        Button("Settings…") {
+        Button(L10n.t(.settingsEllipsis, lang)) {
             openWindow(id: SettingsWindowID.value)
             NSApp.activate(ignoringOtherApps: true)
         }
         .keyboardShortcut(",", modifiers: .command)
 
-        Button("Quit") { NSApp.terminate(nil) }
+        Button(L10n.t(.quit, lang)) { NSApp.terminate(nil) }
             .keyboardShortcut("q", modifiers: .command)
     }
 
-    private var statusLine: String {
-        guard coordinator.isRunning else { return "Status: Inactive" }
+    private func statusLine(_ lang: AppLanguage) -> String {
+        guard coordinator.isRunning else { return L10n.t(.statusInactive, lang) }
         let s = coordinator.linkStatus
+        let source = coordinator.activeSource.localizedName(lang)
         if s.connected {
-            let rate = s.rateHz > 0 ? String(format: " · %.0f Hz", s.rateHz) : ""
-            return "Status: Active — \(coordinator.activeSource.displayName)\(rate)"
+            let rate = s.rateHz > 0 ? L10n.t(.statusRateSuffix, lang, s.rateHz) : ""
+            return L10n.t(.statusActiveConnected, lang, source) + rate
         }
-        return "Status: Active — waiting for \(coordinator.activeSource.displayName)"
+        return L10n.t(.statusActiveWaiting, lang, source)
     }
 }

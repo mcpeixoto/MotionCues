@@ -12,11 +12,13 @@ enum CueIntensity: String, CaseIterable, Codable, Identifiable {
     case low, medium, high
     var id: String { rawValue }
 
-    var displayName: String {
+    var displayName: String { localizedName(.current) }
+
+    func localizedName(_ language: AppLanguage) -> String {
         switch self {
-        case .low: "Low"
-        case .medium: "Medium"
-        case .high: "High"
+        case .low: L10n.t(.low, language)
+        case .medium: L10n.t(.medium, language)
+        case .high: L10n.t(.high, language)
         }
     }
 
@@ -35,11 +37,13 @@ enum CueAppearance: String, CaseIterable, Codable, Identifiable {
     case automatic, light, dark
     var id: String { rawValue }
 
-    var displayName: String {
+    var displayName: String { localizedName(.current) }
+
+    func localizedName(_ language: AppLanguage) -> String {
         switch self {
-        case .automatic: "Follow system"
-        case .light: "Dark dots (for light backgrounds)"
-        case .dark: "Light dots (for dark backgrounds)"
+        case .automatic: L10n.t(.followSystem, language)
+        case .light: L10n.t(.darkDotsForLight, language)
+        case .dark: L10n.t(.lightDotsForDark, language)
         }
     }
 }

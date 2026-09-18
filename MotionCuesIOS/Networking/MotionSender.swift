@@ -45,13 +45,15 @@ final class MotionSender: ObservableObject {
 
         var isStreaming: Bool { if case .streaming = self { return true }; return false }
 
-        var description: String {
+        var description: String { localizedDescription(.current) }
+
+        func localizedDescription(_ language: AppLanguage) -> String {
             switch self {
-            case .idle: "Stopped"
-            case .searching: "Looking for a Mac…"
-            case .connecting(let name): "Connecting to \(name)…"
-            case .streaming(let name): "Streaming to \(name)"
-            case .failed(let reason): "Problem: \(reason)"
+            case .idle: L10n.t(.senderStopped, language)
+            case .searching: L10n.t(.lookingForMac, language)
+            case .connecting(let name): L10n.t(.connectingTo, language, name)
+            case .streaming(let name): L10n.t(.streamingTo, language, name)
+            case .failed(let reason): L10n.t(.problem, language, reason)
             }
         }
     }
@@ -303,7 +305,7 @@ final class LinkCore: @unchecked Sendable {
         timer.setEventHandler { [weak self] in
             guard let self, self.running, self.streaming else { return }
             if hostUptime() - self.lastHeartbeat > MotionCuesService.peerTimeout {
-                self.drop(reason: "Mac stopped responding")
+                self.drop(reason: L10n.t(.macStoppedResponding, .current))
             }
         }
         watchdog = timer

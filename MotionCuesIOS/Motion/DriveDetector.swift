@@ -33,11 +33,21 @@ import CoreLocation
 @MainActor
 final class DriveDetector: NSObject, ObservableObject {
     enum State: String {
-        case unknown = "Unknown"
-        case driving = "In a vehicle"
-        case notDriving = "Not in a vehicle"
-        case unavailable = "Not available on this device"
-        case denied = "Motion access denied"
+        case unknown
+        case driving
+        case notDriving
+        case unavailable
+        case denied
+
+        func localizedName(_ language: AppLanguage = .current) -> String {
+            switch self {
+            case .unknown: L10n.t(.driveUnknown, language)
+            case .driving: L10n.t(.driveInVehicle, language)
+            case .notDriving: L10n.t(.driveNotInVehicle, language)
+            case .unavailable: L10n.t(.driveUnavailable, language)
+            case .denied: L10n.t(.driveMotionDenied, language)
+            }
+        }
     }
 
     @Published private(set) var state: State = .unknown

@@ -49,7 +49,7 @@ final class SimulatedMotionProvider: MotionProvider {
 
             self.status.source = .simulator
             self.status.connected = true
-            self.status.detail = "Synthetic drive"
+            self.status.detail = L10n.t(.syntheticDrive, .current)
             self.onStatusChange?(self.status)
             timer.resume()
         }

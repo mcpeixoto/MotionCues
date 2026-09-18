@@ -96,7 +96,7 @@ final class MotionReceiver: MotionProvider {
         meter.reset()
         status.source = .iPhone
         status.connected = false
-        status.detail = "Advertising \(MotionCuesService.bonjourType)…"
+        status.detail = L10n.t(.advertising, .current, MotionCuesService.bonjourType)
         onStatusChange?(status)
 
         let params = NWParameters.udp
@@ -124,7 +124,7 @@ final class MotionReceiver: MotionProvider {
             startWatchdog()
         } catch {
             status.connected = false
-            status.detail = "Cannot listen: \(error.localizedDescription)"
+            status.detail = L10n.t(.cannotListen, .current, error.localizedDescription)
             onStatusChange?(status)
         }
     }
@@ -143,7 +143,7 @@ final class MotionReceiver: MotionProvider {
             self.status.connected = false
             self.status.rateHz = 0
             self.status.latencyMs = nil
-            self.status.detail = "Stopped"
+            self.status.detail = L10n.t(.stopped, .current)
             self.onStatusChange?(self.status)
         }
     }
@@ -154,19 +154,20 @@ final class MotionReceiver: MotionProvider {
         switch state {
         case .ready:
             let port = listener?.port?.rawValue
-            status.detail = port.map { "Waiting for iPhone on port \($0)" } ?? "Waiting for iPhone"
+            status.detail = port.map { L10n.t(.waitingForIPhoneOnPort, .current, Int($0)) }
+                ?? L10n.t(.waitingForIPhone, .current)
             onStatusChange?(status)
             if let port { readyHandler?(port); readyHandler = nil }
         case .failed(let error):
             status.connected = false
-            status.detail = "Listener failed: \(error.localizedDescription)"
+            status.detail = L10n.t(.listenerFailed, .current, error.localizedDescription)
             onStatusChange?(status)
             // NWListener does not recover on its own; rebuild shortly.
             listener?.cancel()
             listener = nil
             queue.asyncAfter(deadline: .now() + 2) { [weak self] in self?.startLocked() }
         case .waiting(let error):
-            status.detail = "Waiting: \(error.localizedDescription)"
+            status.detail = L10n.t(.waitingWithError, .current, error.localizedDescription)
             onStatusChange?(status)
         default:
             break
@@ -195,7 +196,7 @@ final class MotionReceiver: MotionProvider {
                     self.status.connected = false
                     self.status.rateHz = 0
                     self.status.latencyMs = nil
-                    self.status.detail = "iPhone disconnected"
+                    self.status.detail = L10n.t(.iPhoneDisconnected, .current)
                     self.onStatusChange?(self.status)
                 }
             default:
@@ -276,7 +277,7 @@ final class MotionReceiver: MotionProvider {
                 self.status.connected = false
                 self.status.rateHz = 0
                 self.status.latencyMs = nil
-                self.status.detail = "No data from iPhone"
+                self.status.detail = L10n.t(.noDataFromIPhone, .current)
                 self.onStatusChange?(self.status)
             }
         }
@@ -286,9 +287,9 @@ final class MotionReceiver: MotionProvider {
 
     private static func describe(_ endpoint: NWEndpoint) -> String {
         switch endpoint {
-        case .hostPort(let host, _): "Connected to \(host)"
-        case .service(let name, _, _, _): "Connected to \(name)"
-        default: "Connected"
+        case .hostPort(let host, _): L10n.t(.connectedTo, .current, "\(host)")
+        case .service(let name, _, _, _): L10n.t(.connectedTo, .current, name)
+        default: L10n.t(.connectedPlain, .current)
         }
     }
 }
